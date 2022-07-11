@@ -1545,12 +1545,14 @@ gst_udpsrc_open (GstUDPSrc * src)
 
     GST_DEBUG_OBJECT (src, "binding on port %d", src->port);
 
+    /* HGS */
     /* For multicast, bind to ANY and join the multicast group later */
-    if (g_inet_address_get_is_multicast (addr))
-      bind_addr = g_inet_address_new_any (g_inet_address_get_family (addr));
-    else
-      bind_addr = G_INET_ADDRESS (g_object_ref (addr));
-
+    /*if (g_inet_address_get_is_multicast (addr))
+       bind_addr = g_inet_address_new_any (g_inet_address_get_family (addr));
+       else
+     */
+    bind_addr = G_INET_ADDRESS (g_object_ref (addr));
+    /* HGS */
     g_object_unref (addr);
 
     bind_saddr = g_inet_socket_address_new (bind_addr, src->port);

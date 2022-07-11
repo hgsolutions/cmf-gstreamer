@@ -935,6 +935,25 @@ gst_h265_parse_process_nal (GstH265Parse * h265parse, GstH265NalUnit * nalu)
             GST_H265_PARSE_SEI_ACTIVE)
           h265parse->content_light_level_state = GST_H265_PARSE_SEI_EXPIRED;
       }
+
+      /* HGS */
+      {
+        static gint frame_count = 1;
+
+        if (GST_H265_IS_NAL_TYPE_IDR (nal_type))
+          frame_count = 1;
+
+        if (h265parse->interval > 0 && h265parse->picture_start) {
+          if (frame_count > h265parse->interval) {
+            h265parse->push_codec = TRUE;
+            h265parse->header = TRUE;
+            frame_count = 1;
+          }
+          frame_count++;
+        }
+      }
+      /* HGS */
+
       if (G_LIKELY (!is_irap && !h265parse->push_codec))
         break;
 

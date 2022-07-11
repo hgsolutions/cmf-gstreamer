@@ -1246,3 +1246,69 @@ gst_mpegts_descriptor_from_custom_with_extension (guint8 tag,
 
   return descriptor;
 }
+
+/* HGS */
+/* GST_MTS_DESC_METADATA (0x26) */
+/**
+ * gst_mpegts_descriptor_from_metadata:
+ * @format_identifier: (transfer none): a 4 character format identifier string
+ * @additional_info: (transfer none) (allow-none): pointer to optional additional info
+ * @additional_info_length: length of the optional @additional_info
+ *
+ * Creates a %GST_MTS_DESC_METADATA #GstMpegtsDescriptor
+ *
+ * Return: #GstMpegtsDescriptor, %NULL on failure
+ */
+GstMpegtsDescriptor *
+gst_mpegts_descriptor_from_metadata (guint application_format, guint format)
+{
+  GstMpegtsDescriptor *descriptor;
+
+  descriptor = _new_descriptor (GST_MTS_DESC_METADATA, 9);
+
+  descriptor->data[2] = (application_format & 0xff00) >> 8;
+  descriptor->data[3] = (application_format & 0xff);
+  descriptor->data[4] = format;
+  descriptor->data[5] = 'K';
+  descriptor->data[6] = 'L';
+  descriptor->data[7] = 'V';
+  descriptor->data[8] = 'A';
+  descriptor->data[9] = 0;
+  descriptor->data[10] = 0x0f;
+
+  return descriptor;
+}
+
+/* GST_MTS_DESC_METADATA_STD (0x27) */
+/**
+ * gst_mpegts_descriptor_from_metadata_std:
+ * @format_identifier: (transfer none): a 4 character format identifier string
+ * @additional_info: (transfer none) (allow-none): pointer to optional additional info
+ * @additional_info_length: length of the optional @additional_info
+ *
+ * Creates a %GST_MTS_DESC_METADATA_STD #GstMpegtsDescriptor
+ *
+ * Return: #GstMpegtsDescriptor, %NULL on failure
+ */
+GstMpegtsDescriptor *
+gst_mpegts_descriptor_from_metadata_std (guint input_leak_rate,
+    guint buffer_size, guint output_leak_rate)
+{
+  GstMpegtsDescriptor *descriptor;
+
+  descriptor = _new_descriptor (GST_MTS_DESC_METADATA_STD, 9);
+
+  descriptor->data[2] = ((input_leak_rate & 0xff0000) >> 16) | 0xc0;
+  descriptor->data[3] = (input_leak_rate & 0xff00) >> 8;
+  descriptor->data[4] = input_leak_rate & 0xff;
+  descriptor->data[5] = ((buffer_size & 0xff0000) >> 16) | 0xc0;
+  descriptor->data[6] = (buffer_size & 0xff00) >> 8;;
+  descriptor->data[7] = buffer_size & 0xff;
+  descriptor->data[8] = ((output_leak_rate & 0xff0000) >> 16) | 0xc0;
+  descriptor->data[9] = (output_leak_rate & 0xff00) >> 8;;
+  descriptor->data[10] = output_leak_rate & 0xff;
+
+  return descriptor;
+}
+
+/* HGS */

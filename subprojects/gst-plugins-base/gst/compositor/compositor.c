@@ -1021,10 +1021,17 @@ _fixate_caps (GstAggregator * agg, GstCaps * caps)
     best_fps = 25.0;
   }
 
-  gst_structure_fixate_field_nearest_int (s, "width", best_width);
-  gst_structure_fixate_field_nearest_int (s, "height", best_height);
-  gst_structure_fixate_field_nearest_fraction (s, "framerate", best_fps_n,
-      best_fps_d);
+  /* HGS */
+  gst_structure_set (s, "width", G_TYPE_INT, best_width,
+      "height", G_TYPE_INT, best_height, "framerate",
+      GST_TYPE_FRACTION, best_fps_n, best_fps_d, NULL);
+  /*
+     gst_structure_fixate_field_nearest_int (s, "width", best_width);
+     gst_structure_fixate_field_nearest_int (s, "height", best_height);
+     gst_structure_fixate_field_nearest_fraction (s, "framerate", best_fps_n,
+     best_fps_d);
+   */
+  /* HGS */
   ret = gst_caps_fixate (ret);
 
   return ret;

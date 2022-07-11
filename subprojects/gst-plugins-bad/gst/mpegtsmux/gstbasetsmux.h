@@ -184,6 +184,13 @@ struct GstBaseTsMux {
   GstBuffer *out_buffer;
   GstClockTimeDiff output_ts_offset;
 
+  /* HGS */
+  gint current_stream_count;
+  GList *video_pids;
+  GstBuffer *incoming_buffer;
+  GstClockTime usec_time;
+  /* HGS */
+
   /* protects the tsmux object, the programs hash table, and pad streams */
   GMutex lock;
 };

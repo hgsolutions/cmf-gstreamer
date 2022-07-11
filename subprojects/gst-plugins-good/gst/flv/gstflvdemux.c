@@ -2202,6 +2202,11 @@ gst_flv_demux_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer)
   }
 
 parse:
+  /* HGS - Prevent failure of tracks with no data */
+  if (G_UNLIKELY (ret == GST_FLOW_NOT_LINKED))
+    ret = GST_FLOW_OK;
+  /* HGS */
+
   if (G_UNLIKELY (ret != GST_FLOW_OK)) {
     GST_DEBUG_OBJECT (demux, "got flow return %s", gst_flow_get_name (ret));
     goto beach;

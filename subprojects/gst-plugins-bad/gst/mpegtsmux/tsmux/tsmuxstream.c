@@ -196,6 +196,16 @@ tsmux_stream_new (guint16 pid, guint stream_type)
           TSMUX_PACKET_FLAG_PES_FULL_HEADER |
           TSMUX_PACKET_FLAG_PES_DATA_ALIGNMENT;
       break;
+      /* HGS */
+    case TSMUX_ST_PS_SYNC_KLV:
+      stream->id = 0xFC;
+      stream->stream_type = TSMUX_ST_METADATA;
+      stream->is_meta = TRUE;
+      stream->pi.flags |=
+          TSMUX_PACKET_FLAG_PES_FULL_HEADER |
+          TSMUX_PACKET_FLAG_PES_DATA_ALIGNMENT;
+      break;
+      /* HGS */
     case TSMUX_ST_PS_OPUS:
       /* FIXME: assign sequential extended IDs? */
       stream->id = 0xBD;
@@ -1038,9 +1048,25 @@ tsmux_stream_default_get_es_descrs (TsMuxStream * stream,
         g_ptr_array_add (pmt_stream->descriptors, descriptor);
       }
       if (stream->is_meta) {
-        descriptor = gst_mpegts_descriptor_from_registration ("KLVA", NULL, 0);
-        GST_DEBUG ("adding KLVA registration descriptor");
+        /* HGS */
+        if (stream->stream_type == TSMUX_ST_PRIVATE_DATA) {
+          descriptor =
+              gst_mpegts_descriptor_from_registration ("KLVA", NULL, 0);
+          GST_DEBUG ("adding KLVA registration descriptor");
+          g_ptr_array_add (pmt_stream->descriptors, descriptor);
+        }
+        descriptor =
+            gst_mpegts_descriptor_from_metadata (stream->application_format,
+            stream->format);
+        GST_DEBUG ("adding KLVA metadata descriptor");
         g_ptr_array_add (pmt_stream->descriptors, descriptor);
+
+        descriptor =
+            gst_mpegts_descriptor_from_metadata_std (stream->input_leak_rate,
+            stream->buffer_size, stream->output_leak_rate);
+        GST_DEBUG ("adding KLVA metadata descriptor std");
+        g_ptr_array_add (pmt_stream->descriptors, descriptor);
+        /* HGS */
       }
     default:
       break;

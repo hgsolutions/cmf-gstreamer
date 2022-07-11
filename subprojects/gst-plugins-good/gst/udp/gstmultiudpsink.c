@@ -47,6 +47,12 @@
 #include "gst/net/net.h"
 #include "gst/glib-compat-private.h"
 
+/* HGS */
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+/* HGS */
+
 GST_DEBUG_CATEGORY_STATIC (multiudpsink_debug);
 #define GST_CAT_DEFAULT (multiudpsink_debug)
 
@@ -419,6 +425,9 @@ gst_multiudpsink_init (GstMultiUDPSink * sink)
   sink->qos_dscp = DEFAULT_QOS_DSCP;
   sink->send_duplicates = DEFAULT_SEND_DUPLICATES;
   sink->multi_iface = g_strdup (DEFAULT_MULTICAST_IFACE);
+  /* HGS */
+  sink->multi_iface_host = g_strdup (DEFAULT_MULTICAST_IFACE);
+  /* HGS */
 
   gst_multiudpsink_create_cancellable (sink);
 
@@ -550,6 +559,11 @@ gst_multiudpsink_finalize (GObject * object)
 
   g_free (sink->multi_iface);
   sink->multi_iface = NULL;
+
+  /* HGS */
+  g_free (sink->multi_iface_host);
+  sink->multi_iface_host = NULL;
+  /* HGS */
 
   g_free (sink->vecs);
   sink->vecs = NULL;
@@ -1401,11 +1415,56 @@ gst_multiudpsink_start (GstBaseSink * bsink)
 #ifdef SO_BINDTODEVICE
   if (sink->multi_iface) {
     if (sink->used_socket) {
-      if (setsockopt (g_socket_get_fd (sink->used_socket), SOL_SOCKET,
-              SO_BINDTODEVICE, sink->multi_iface,
-              strlen (sink->multi_iface)) < 0)
-        GST_WARNING_OBJECT (sink, "setsockopt SO_BINDTODEVICE failed: %s",
-            strerror (errno));
+      /* HGS - Handle converting interface name to IP address */
+      struct ifaddrs *ifaddr;
+
+      if (getifaddrs (&ifaddr) == 0) {
+        struct ifaddrs *ifa;
+        struct in_addr interface;
+        char host[NI_MAXHOST];
+        int n;
+
+        for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+          if (ifa->ifa_addr == NULL)
+            continue;
+
+          if (ifa->ifa_addr->sa_family == AF_INET) {
+            int s = getnameinfo (ifa->ifa_addr, sizeof (struct sockaddr_in),
+                host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+            if (s != 0)
+              continue;
+
+            if (strcmp (sink->multi_iface, ifa->ifa_name) == 0) {
+              sink->multi_iface_host = g_strdup (host);
+              break;
+            }
+            if (strcmp (sink->multi_iface, host) == 0) {
+              sink->multi_iface_host = sink->multi_iface;
+              sink->multi_iface = g_strdup (ifa->ifa_name);
+              break;
+            }
+          }
+        }
+
+        inet_aton (sink->multi_iface_host, &interface);
+
+        if (setsockopt (g_socket_get_fd (sink->used_socket), IPPROTO_IP,
+                IP_MULTICAST_IF, &interface, sizeof (interface)) < 0)
+          GST_WARNING_OBJECT (sink, "setsockopt IP_MULTICAST_IF failed: %s",
+              strerror (errno));
+
+        freeifaddrs (ifaddr);
+      } else {
+        GST_ERROR_OBJECT (sink, "getifaddrs call failed: %s", strerror (errno));
+      }
+      /* HGS */
+      /*
+         if (setsockopt (g_socket_get_fd (sink->used_socket), SOL_SOCKET,
+         SO_BINDTODEVICE, sink->multi_iface,
+         strlen (sink->multi_iface)) < 0)
+         GST_WARNING_OBJECT (sink, "setsockopt SO_BINDTODEVICE failed: %s",
+         strerror (errno));
+       */
     }
     if (sink->used_socket_v6) {
       if (setsockopt (g_socket_get_fd (sink->used_socket_v6), SOL_SOCKET,
@@ -1435,6 +1494,13 @@ gst_multiudpsink_start (GstBaseSink * bsink)
 
     if (!gst_multiudpsink_configure_client (sink, client))
       return FALSE;
+
+    /* HGS */
+    if (sink->used_socket) {
+      GCancellable *cancellable = g_cancellable_new ();
+      g_socket_connect (sink->used_socket, client->addr, cancellable, &err);
+    }
+    /* HGS */
   }
   return TRUE;
 

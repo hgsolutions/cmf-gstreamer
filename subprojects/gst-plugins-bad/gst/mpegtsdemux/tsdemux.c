@@ -50,6 +50,10 @@
 #include <gst/codecparsers/gstmpegvideoparser.h>
 #include <gst/video/video-color.h>
 
+/* HGS */
+#include <gst/codecparsers/gstklvmeta.h>
+/* HGS */
+
 #include <math.h>
 
 #define _gst_log2(x) (log(x)/log(2))
@@ -302,7 +306,12 @@ enum
   PROP_EMIT_STATS,
   PROP_LATENCY,
   PROP_SEND_SCTE35_EVENTS,
-  /* FILL ME */
+  /* HGS */
+  PROP_ENABLE_VIDEO,
+  PROP_ENABLE_AUDIO,
+  PROP_ENABLE_PRIVATE
+      /* HGS */
+      /* FILL ME */
 };
 
 /* Pad functions */
@@ -435,6 +444,23 @@ gst_ts_demux_class_init (GstTSDemuxClass * klass)
           G_MAXINT, DEFAULT_LATENCY,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  /* HGS */
+  g_object_class_install_property (gobject_class, PROP_ENABLE_VIDEO,
+      g_param_spec_boolean ("enable-video", "Enable Video",
+          "Enable parsing and output of video stream", TRUE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_ENABLE_AUDIO,
+      g_param_spec_boolean ("enable-audio", "Enable Audio",
+          "Enable parsing and output of audio stream", TRUE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_ENABLE_PRIVATE,
+      g_param_spec_boolean ("enable-private", "Enable Private",
+          "Enable parsing and output of private data stream", TRUE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  /* HGS */
+
   element_class = GST_ELEMENT_CLASS (klass);
   gst_element_class_add_pad_template (element_class,
       gst_static_pad_template_get (&video_template));
@@ -514,6 +540,12 @@ gst_ts_demux_init (GstTSDemux * demux)
   demux->latency = DEFAULT_LATENCY;
   gst_ts_demux_reset (base);
 
+  /* HGS */
+  demux->enable_video = TRUE;
+  demux->enable_audio = TRUE;
+  demux->enable_private = TRUE;
+  /* HGS */
+
   g_mutex_init (&demux->lock);
 }
 
@@ -539,6 +571,17 @@ gst_ts_demux_set_property (GObject * object, guint prop_id,
     case PROP_LATENCY:
       demux->latency = g_value_get_int (value);
       break;
+      /* HGS */
+    case PROP_ENABLE_VIDEO:
+      demux->enable_video = g_value_get_boolean (value);
+      break;
+    case PROP_ENABLE_AUDIO:
+      demux->enable_audio = g_value_get_boolean (value);
+      break;
+    case PROP_ENABLE_PRIVATE:
+      demux->enable_private = g_value_get_boolean (value);
+      break;
+      /* HGS */
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
   }
@@ -563,6 +606,17 @@ gst_ts_demux_get_property (GObject * object, guint prop_id,
     case PROP_LATENCY:
       g_value_set_int (value, demux->latency);
       break;
+      /* HGS */
+    case PROP_ENABLE_VIDEO:
+      g_value_set_boolean (value, demux->enable_video);
+      break;
+    case PROP_ENABLE_AUDIO:
+      g_value_set_boolean (value, demux->enable_audio);
+      break;
+    case PROP_ENABLE_PRIVATE:
+      g_value_set_boolean (value, demux->enable_private);
+      break;
+      /* HGS */
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
   }
@@ -1348,6 +1402,11 @@ create_pad_for_stream (MpegTSBase * base, MpegTSBaseStream * bstream,
   gboolean sparse = FALSE;
   gboolean is_audio = FALSE, is_video = FALSE, is_subpicture = FALSE,
       is_private = FALSE;
+  /* HGS */
+  gboolean enable_stream = TRUE;
+  const GstMpegtsDescriptor *meta_desc = NULL;
+  const GstMpegtsDescriptor *meta_std_desc = NULL;
+  /* HGS */
 
   gst_ts_demux_create_tags (stream);
 
@@ -1681,8 +1740,34 @@ create_pad_for_stream (MpegTSBase * base, MpegTSBaseStream * bstream,
         case DRF_ID_KLVA:
           sparse = TRUE;
           is_private = TRUE;
-          caps = gst_caps_new_simple ("meta/x-klv",
-              "parsed", G_TYPE_BOOLEAN, TRUE, NULL);
+          /* HGS */
+          meta_desc =
+              mpegts_get_descriptor_from_stream (bstream,
+              GST_MTS_DESC_METADATA);
+          meta_std_desc =
+              mpegts_get_descriptor_from_stream (bstream,
+              GST_MTS_DESC_METADATA_STD);
+          if (meta_desc && meta_std_desc) {
+            caps = gst_caps_new_simple ("meta/x-klv",
+                "stream_type", G_TYPE_INT, bstream->stream_type,
+                "application_format", G_TYPE_INT,
+                DESC_METADATA_application_format (meta_desc->data), "format",
+                G_TYPE_INT, DESC_METADATA_format (meta_desc->data),
+                "input_leak_rate", G_TYPE_INT,
+                DESC_METADATA_input_leak_rate (meta_std_desc->data),
+                "buffer_size", G_TYPE_INT,
+                DESC_METADATA_buffer_size (meta_std_desc->data),
+                "output_leak_rate", G_TYPE_INT,
+                DESC_METADATA_output_leak_rate (meta_std_desc->data), NULL);
+          } else {
+            caps = gst_caps_new_simple ("meta/x-klv",
+                "stream_type", G_TYPE_INT, bstream->stream_type, NULL);
+          }
+          /*
+             caps = gst_caps_new_simple ("meta/x-klv",
+             "parsed", G_TYPE_BOOLEAN, TRUE, NULL);
+           */
+          /* HGS */
           break;
         case DRF_ID_AC4:
           is_audio = TRUE;
@@ -1960,7 +2045,15 @@ done:
 
   }
 
-  if (template && name && caps) {
+  /* HGS */
+  if ((is_video == TRUE && demux->enable_video == FALSE)
+      || (is_audio == TRUE && demux->enable_audio == FALSE)
+      || (is_private == TRUE && demux->enable_private == FALSE)) {
+    enable_stream = FALSE;
+  }
+  /* HGS */
+
+  if (enable_stream && template && name && caps) {
     GstEvent *event;
     const gchar *stream_id;
 
@@ -3435,6 +3528,27 @@ gst_ts_demux_push_pending_data (GstTSDemux * demux, TSDemuxStream * stream,
     } else {
       buffer = gst_buffer_new_wrapped (stream->data, stream->current_size);
     }
+
+    /* HGS - Set AU header metadata on buffer */
+    if (bs->stream_type == GST_MPEGTS_STREAM_TYPE_METADATA_PES_PACKETS) {
+      GstKlvMeta meta;
+
+      meta.metadata_service_id = stream->data[0];
+      meta.sequence_number = stream->data[1];
+      meta.flags = stream->data[2];
+      meta.au_cell_data_length = (stream->data[3] << 8) | stream->data[4];
+
+      GST_DEBUG_OBJECT (stream->pad,
+          "Adding GstKlvMeta to buffer (metadata_service_id:%i, sequence_number:%i, flags:%i, au_cell_data_length:%i)",
+          meta.metadata_service_id, meta.sequence_number, meta.flags,
+          meta.au_cell_data_length);
+
+      gst_buffer_add_klv_meta (buffer, meta.metadata_service_id,
+          meta.sequence_number, meta.flags, meta.au_cell_data_length);
+      //Remove AU header. We'll add it back in the TS muxer
+      gst_buffer_resize (buffer, 5, gst_buffer_get_size (buffer) - 5);
+    }
+    /* HGS */
 
     if (G_UNLIKELY (stream->pending_ts && !check_pending_buffers (demux))) {
       if (buffer) {

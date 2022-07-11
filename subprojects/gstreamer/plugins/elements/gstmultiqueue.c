@@ -133,6 +133,10 @@ struct _GstSingleQueue
    */
   gboolean pushed;
 
+  /* HGS */
+  gboolean recent_push;
+  /* HGS */
+
   /* segments */
   GstSegment sink_segment;
   GstSegment src_segment;
@@ -356,6 +360,13 @@ struct _GstMultiQueuePadClass
 GType gst_multiqueue_pad_get_type (void);
 
 G_DEFINE_TYPE (GstMultiQueuePad, gst_multiqueue_pad, GST_TYPE_PAD);
+
+/* HGS */
+static gpointer gst_multi_queue_monitor (gpointer);
+GThread *monitor = NULL;
+gboolean monitor_running = FALSE;
+gboolean flushing_queues = FALSE;
+/* HGS */
 
 static guint
 gst_multiqueue_pad_get_group_id (GstMultiQueuePad * pad)
@@ -1282,6 +1293,24 @@ gst_multi_queue_change_state (GstElement * element, GstStateChange transition)
 
       break;
     }
+      /* HGS */
+    case GST_STATE_CHANGE_PAUSED_TO_PLAYING:{
+      if (monitor == NULL) {
+        monitor_running = TRUE;
+        monitor = g_thread_new ("Blocked Queue Monitor",
+            gst_multi_queue_monitor, mqueue);
+      }
+      break;
+    }
+    case GST_STATE_CHANGE_PLAYING_TO_PAUSED:{
+      if (monitor) {
+        monitor_running = FALSE;
+        g_thread_join (monitor);
+        monitor = NULL;
+      }
+      break;
+    }
+      /* HGS */
     case GST_STATE_CHANGE_PAUSED_TO_READY:{
       GList *tmp;
 
@@ -1451,6 +1480,54 @@ get_buffering_level (GstMultiQueue * mq, GstSingleQueue * sq)
 
   return buffering_level;
 }
+
+/* HGS */
+static gpointer
+gst_multi_queue_monitor (gpointer data)
+{
+  GList *tmp;
+  GstSingleQueue *sq;
+  GstMultiQueue *mq = (GstMultiQueue *) data;
+  gint64 last_time = g_get_monotonic_time ();
+  gboolean is_pushing;
+
+  while (monitor_running) {
+    /* Check every 5 seconds to see if any
+     * buffers are being pushed */
+    if (g_get_monotonic_time () > (last_time + 5000000)) {
+      last_time = g_get_monotonic_time ();
+      is_pushing = FALSE;
+
+      for (tmp = mq->queues; tmp; tmp = g_list_next (tmp)) {
+
+        sq = (GstSingleQueue *) tmp->data;
+        if (!sq->is_sparse)
+          is_pushing |= sq->recent_push;
+
+        sq->recent_push = FALSE;
+      }
+
+      /* The queue has stalled. Flush all buffers */
+      if (!is_pushing) {
+        g_printerr
+            ("Multiqueue has stalled - Flushing all queues so we don't block pipeline\n");
+
+        flushing_queues = TRUE;
+
+        for (tmp = mq->queues; tmp; tmp = g_list_next (tmp)) {
+          sq = (GstSingleQueue *) tmp->data;
+          gst_single_queue_flush (mq, sq, FALSE, TRUE);
+        }
+
+        flushing_queues = FALSE;
+      }
+    }
+    g_usleep (50000);
+  }
+  return NULL;
+}
+
+/* HGS */
 
 /* WITH LOCK TAKEN */
 static void
@@ -2103,6 +2180,11 @@ gst_multi_queue_loop (GstPad * pad)
   if (!mq || !srcpad)
     goto out_flushing;
 
+  /* HGS */
+  if (flushing_queues)
+    return;
+  /* HGS */
+
 next:
   GST_DEBUG_OBJECT (mq, "SingleQueue %d : trying to pop an object", sq->id);
 
@@ -2306,8 +2388,10 @@ next:
     }
   }
 
+  /* HGS */
   if (is_buffer)
-    sq->pushed = TRUE;
+    sq->recent_push = sq->pushed = TRUE;
+  /* HGS */
 
   /* now hold on a bit;
    * can not simply throw this result to upstream, because

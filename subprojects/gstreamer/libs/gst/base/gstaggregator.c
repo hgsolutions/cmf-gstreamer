@@ -512,10 +512,16 @@ gst_aggregator_check_pads_ready (GstAggregator * self,
 
       /* Only consider this pad as worth waiting for if it's not already EOS.
        * There's no point in waiting for buffers on EOS pads */
-      if (!pad->priv->eos)
-        have_buffer = FALSE;
-      else
-        n_ready++;
+      /* HGS - Comment this section. It's occasionally causes
+       * a lockup of pipeline but works correctly
+       * without this check.
+       */
+      /*
+         if (!pad->priv->eos)
+         have_buffer = FALSE;
+         else
+       */
+      n_ready++;
     } else if (self->priv->peer_latency_live) {
       /* In live mode, having a single pad with buffers is enough to
        * generate a start time from it. In non-live mode all pads need
@@ -566,6 +572,13 @@ pad_not_ready:
 
     if (have_event_or_query_ret)
       *have_event_or_query_ret = have_event_or_query;
+
+    /* HGS */
+    if (pad->sparse) {
+      g_usleep (500);
+      return TRUE;
+    }
+    /* HGS */
 
     return FALSE;
   }
@@ -3031,6 +3044,26 @@ gst_aggregator_pad_chain_internal (GstAggregator * self,
   PAD_UNLOCK (aggpad);
 
   buf_pts = GST_BUFFER_PTS (buffer);
+
+  /* HGS - Apply timestamps to buffers that don't have
+   * one set. Used primarily for async KLV from TS demuxer */
+  {
+    static GstClockTime last_dts = GST_CLOCK_TIME_NONE;
+
+    if (buf_pts != GST_CLOCK_TIME_NONE) {
+      GstClockTime buf_dts = GST_BUFFER_DTS (buffer);
+      last_dts = buf_dts != GST_CLOCK_TIME_NONE ? buf_dts : buf_pts;
+    } else {
+      if (buf_pts == GST_CLOCK_TIME_NONE && last_dts != GST_CLOCK_TIME_NONE) {
+        GST_BUFFER_PTS (buffer) = last_dts;
+        GST_BUFFER_DTS (buffer) = last_dts;
+      } else {
+        gst_buffer_unref (buffer);
+        return GST_FLOW_OK;
+      }
+    }
+  }
+  /* HGS */
 
   for (;;) {
     SRC_LOCK (self);

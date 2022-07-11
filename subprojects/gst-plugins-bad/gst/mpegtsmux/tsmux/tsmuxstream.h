@@ -117,6 +117,9 @@ enum TsMuxStreamType {
   /* later extensions */
   TSMUX_ST_AUDIO_AAC                  = 0x0f,
   TSMUX_ST_VIDEO_MPEG4                = 0x10,
+  /* HGS */
+  TSMUX_ST_METADATA = 0x15,
+  /* HGS */
   TSMUX_ST_VIDEO_H264                 = 0x1b,
   TSMUX_ST_VIDEO_HEVC                 = 0x24,
   TSMUX_ST_VIDEO_JP2K = 0x21,
@@ -129,6 +132,9 @@ enum TsMuxStreamType {
   TSMUX_ST_PS_TELETEXT                = 0x8d,
   TSMUX_ST_PS_KLV                     = 0x8e,    /* only used internally */
   TSMUX_ST_PS_OPUS                    = 0x8f,    /* only used internally */
+  /* HGS */
+  TSMUX_ST_PS_SYNC_KLV = 0x90,  /* only used internally */
+  /* HGS */
   TSMUX_ST_PS_DVD_SUBPICTURE          = 0xff,
 
   /* Non-standard definitions */
@@ -200,6 +206,14 @@ struct TsMuxStream {
   gint audio_sampling;
   gint audio_channels;
   gint audio_bitrate;
+
+  /* HGS - KLV Metadata descriptor details */
+  gint application_format;
+  gint format;
+  gint input_leak_rate;
+  gint buffer_size;
+  gint output_leak_rate;
+  /* HGS */
 
   gboolean is_dvb_sub;
   gchar language[4];

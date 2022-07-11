@@ -110,6 +110,12 @@ struct _GstTSDemux
 
   /* This is to protect demux->segment_event */
   GMutex lock;
+
+  /* HGS */
+  gboolean enable_video;
+  gboolean enable_audio;
+  gboolean enable_private;
+  /* HGS */
 };
 
 struct _GstTSDemuxClass

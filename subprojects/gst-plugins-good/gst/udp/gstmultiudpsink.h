@@ -92,6 +92,9 @@ struct _GstMultiUDPSink {
 
   gboolean       auto_multicast;
   gchar         *multi_iface;
+  /* HGS */
+  gchar *multi_iface_host;
+  /* HGS */
   gint           ttl;
   gint           ttl_mc;
   gboolean       loop;

@@ -1051,7 +1051,13 @@ gst_h264_parse_process_nal (GstH264Parse * h264parse, GstH264NalUnit * nalu)
       h264parse->state &= GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS;
       if (!GST_H264_PARSE_STATE_VALID (h264parse,
               GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS))
-        return FALSE;
+        /* HGS - We won't return FALSE if we have no SPS/PPS because it can cause collect
+         * pads in muxer to block while waiting on data and filling up buffers from other streams.
+         */
+        GST_DEBUG_OBJECT (h264parse,
+            "Waiting on valid SPS/PPS but passing slice anyhow.");
+      //return FALSE;
+      /* HGS */
 
       /* This is similar to the GOT_SLICE state, but is only reset when the
        * AU is complete. This is used to keep track of AU */
@@ -1085,6 +1091,24 @@ gst_h264_parse_process_nal (GstH264Parse * h264parse, GstH264NalUnit * nalu)
         h264parse->state |= GST_H264_PARSE_STATE_GOT_SLICE;
         h264parse->field_pic_flag = slice.field_pic_flag;
       }
+
+      /* HGS */
+      {
+        static gint frame_count = 1;
+
+        if (nal_type == GST_H264_NAL_SLICE_IDR)
+          frame_count = 1;
+
+        if (h264parse->interval > 0 && h264parse->frame_start) {
+          if (frame_count > h264parse->interval) {
+            h264parse->push_codec = TRUE;
+            h264parse->header = TRUE;
+            frame_count = 1;
+          }
+          frame_count++;
+        }
+      }
+      /* HGS */
 
       if (G_LIKELY (nal_type != GST_H264_NAL_SLICE_IDR &&
               !h264parse->push_codec))

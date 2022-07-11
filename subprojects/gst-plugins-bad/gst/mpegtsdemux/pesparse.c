@@ -52,6 +52,9 @@ mpegts_parse_pes_header (const guint8 * data, gsize length, PESHeader * res)
   const guint8 *origdata = data;
   guint32 val32;
   guint8 val8, flags;
+  /* HGS */
+  static guint64 last_ts = -1;
+  /* HGS */
 
   g_assert (res != NULL);
 
@@ -169,6 +172,16 @@ mpegts_parse_pes_header (const guint8 * data, gsize length, PESHeader * res)
     GST_LOG ("DTS %" G_GUINT64_FORMAT " %" GST_TIME_FORMAT,
         res->DTS, GST_TIME_ARGS (MPEGTIME_TO_GSTTIME (res->DTS)));
   }
+
+  /* HGS - Apply timestamps to PES headers that don't
+   * have one set. Used primarily for async KLV */
+  if (res->PTS == -1)
+    res->PTS = last_ts;
+  if (res->DTS == -1)
+    res->DTS = last_ts;
+  else
+    last_ts = res->DTS;
+  /* HGS */
 
   if (flags & 0x20) {
     /* ESCR */

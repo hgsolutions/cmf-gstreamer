@@ -855,6 +855,11 @@ gst_debug_bin_to_dot_file (GstBin * bin, GstDebugGraphDetails details,
 
   g_return_if_fail (GST_IS_BIN (bin));
 
+  /* HGS */
+  if (details == GST_DEBUG_GRAPH_SHOW_VERBOSE)
+    priv_gst_dump_dot_dir = "/tmp";
+  /* HGS */
+
   if (G_LIKELY (priv_gst_dump_dot_dir == NULL))
     return;
 

@@ -68,6 +68,21 @@
 #define DESC_REGISTRATION_additional_ident_info_len(desc)	((desc)[1] - 4)
 #define DESC_REGISTRATION_additional_ident_info(desc)		(&(desc)[6])
 
+/* HGS */
+/* metadata_descriptor 0x26 */
+#define DESC_METADATA_application_format(desc)                  (GST_READ_UINT16_BE ((desc)+2))
+#define DESC_METADATA_format(desc)                              ((desc)[4])
+#define DESC_METADATA_format_identifier(desc)                   (GST_READ_UINT32_BE ((desc)+6))
+#define DESC_METADATA_service_id(desc)                          ((desc)[9])
+#define DESC_METADATA_decoder_config_flags(desc)                ((desc[10] >> 5) & 0x7)
+#define DESC_METADATA_dsm_cc_flags(desc)                        ((desc[10] >> 4) & 0x1)
+
+/* metadata_descriptor 0x27 */
+#define DESC_METADATA_input_leak_rate(desc)                     (GST_READ_UINT24_BE ((desc)+2) & 0x3fffff)
+#define DESC_METADATA_buffer_size(desc)                         (GST_READ_UINT24_BE ((desc)+5) & 0x3fffff)
+#define DESC_METADATA_output_leak_rate(desc)                    (GST_READ_UINT24_BE ((desc)+8) & 0x3fffff)
+/* HGS */
+
 /* data_stream_alignment_descriptor */
 #define DESC_DATA_STREAM_ALIGNMENT_alignment_type(desc)		((desc)[2])
 

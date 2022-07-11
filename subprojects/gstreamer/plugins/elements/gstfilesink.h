@@ -95,6 +95,11 @@ struct _GstFileSink {
   gboolean o_sync;
   gint max_transient_error_timeout;
 
+  /* HGS */
+  gboolean ignore_segment_events;
+  gboolean create_parent_directories;
+  /* HGS */
+
   gboolean flushing;
 };
 

@@ -111,6 +111,10 @@ GST_DEBUG_CATEGORY_STATIC (gst_file_sink_debug);
 #define DEFAULT_APPEND		FALSE
 #define DEFAULT_O_SYNC		FALSE
 #define DEFAULT_MAX_TRANSIENT_ERROR_TIMEOUT	0
+/* HGS */
+#define DEFAULT_CREATE_PARENT_DIRECTORIES FALSE
+#define DEFAULT_IGNORE_SEGMENT_EVENTS     FALSE
+/* HGS */
 
 enum
 {
@@ -121,6 +125,10 @@ enum
   PROP_APPEND,
   PROP_O_SYNC,
   PROP_MAX_TRANSIENT_ERROR_TIMEOUT,
+  /* HGS */
+  PROP_CREATE_PARENT_DIRECTORIES,
+  PROP_IGNORE_SEGMENT_EVENTS,
+  /* HGS */
   PROP_LAST
 };
 
@@ -253,6 +261,22 @@ gst_file_sink_class_init (GstFileSinkClass * klass)
           G_MAXINT, DEFAULT_MAX_TRANSIENT_ERROR_TIMEOUT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  /* HGS */
+  g_object_class_install_property (gobject_class,
+      PROP_CREATE_PARENT_DIRECTORIES,
+      g_param_spec_boolean ("create-parent-directories",
+          "Create Parent Directories",
+          "Creates any missing parent directories specified in the file location",
+          DEFAULT_CREATE_PARENT_DIRECTORIES,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_IGNORE_SEGMENT_EVENTS,
+      g_param_spec_boolean ("ignore-segment-events", "Ignore Segment Events",
+          "Ignore segment events to prevent seeking",
+          DEFAULT_IGNORE_SEGMENT_EVENTS,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  /* HGS */
+
   gst_element_class_set_static_metadata (gstelement_class,
       "File Sink",
       "Sink/File", "Write stream to a file",
@@ -364,6 +388,14 @@ gst_file_sink_set_property (GObject * object, guint prop_id,
     case PROP_MAX_TRANSIENT_ERROR_TIMEOUT:
       sink->max_transient_error_timeout = g_value_get_int (value);
       break;
+      /* HGS */
+    case PROP_CREATE_PARENT_DIRECTORIES:
+      sink->create_parent_directories = g_value_get_boolean (value);
+      break;
+    case PROP_IGNORE_SEGMENT_EVENTS:
+      sink->ignore_segment_events = g_value_get_boolean (value);
+      break;
+      /* HGS */
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -395,6 +427,14 @@ gst_file_sink_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_MAX_TRANSIENT_ERROR_TIMEOUT:
       g_value_set_int (value, sink->max_transient_error_timeout);
       break;
+      /* HGS */
+    case PROP_CREATE_PARENT_DIRECTORIES:
+      g_value_set_boolean (value, sink->create_parent_directories);
+      break;
+    case PROP_IGNORE_SEGMENT_EVENTS:
+      g_value_set_boolean (value, sink->ignore_segment_events);
+      break;
+      /* HGS */
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -407,6 +447,22 @@ gst_file_sink_open_file (GstFileSink * sink)
   /* open the file */
   if (sink->filename == NULL || sink->filename[0] == '\0')
     goto no_filename;
+
+  /* HGS */
+  if (sink->create_parent_directories) {
+    gchar *dest_directory = strdup (sink->filename);
+    gchar *offset = strrchr (dest_directory, '/');
+    if (offset) {
+      *offset = '\0';
+      if (!g_file_test (dest_directory, G_FILE_TEST_IS_DIR)) {
+        g_mkdir_with_parents (dest_directory, 0770);
+      }
+    }
+    g_free (dest_directory);
+
+    fprintf (stderr, "sink-file-path: %s\n", sink->filename);
+  }
+  /* HGS */
 
   if (sink->append)
     sink->file = gst_fopen (sink->filename, "ab", sink->o_sync);
@@ -607,6 +663,15 @@ gst_file_sink_event (GstBaseSink * sink, GstEvent * event)
     case GST_EVENT_SEGMENT:
     {
       const GstSegment *segment;
+
+      /* HGS */
+      if (filesink->ignore_segment_events) {
+        GST_DEBUG_OBJECT (filesink,
+            "Ignored SEGMENT event of format %u (%s)", (guint) segment->format,
+            gst_format_get_name (segment->format));
+        break;
+      }
+      /* HGS */
 
       gst_event_parse_segment (event, &segment);
 

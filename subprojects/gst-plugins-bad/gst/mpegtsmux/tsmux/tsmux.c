@@ -98,6 +98,10 @@
  * so we have some slack to go backwards */
 #define CLOCK_BASE (TSMUX_CLOCK_FREQ * 10 * 360)
 
+/* HGS */
+guint8 pmt_version = 0;
+/* HGS */
+
 static gboolean tsmux_write_pat (TsMux * mux);
 static gboolean tsmux_write_pmt (TsMux * mux, TsMuxProgram * program);
 static gboolean tsmux_write_scte_null (TsMux * mux, TsMuxProgram * program);
@@ -462,6 +466,10 @@ tsmux_program_new (TsMux * mux, gint prog_id)
   mux->programs = g_list_prepend (mux->programs, program);
   mux->nb_programs++;
   mux->pat_changed = TRUE;
+
+  /* HGS */
+  program->pmt_version = pmt_version;
+  /* HGS */
 
   return program;
 }
@@ -1643,7 +1651,10 @@ tsmux_write_stream_packet (TsMux * mux, TsMuxStream * stream)
   res = tsmux_packet_out (mux, buf, new_pcr);
 
   /* Reset all dynamic flags */
-  stream->pi.flags &= TSMUX_PACKET_FLAG_PES_FULL_HEADER;
+  /* HGS */
+  stream->pi.flags &=
+      TSMUX_PACKET_FLAG_PES_FULL_HEADER | TSMUX_PACKET_FLAG_PES_DATA_ALIGNMENT;
+  /* HGS */
 
   return res;
 
@@ -1840,7 +1851,10 @@ tsmux_write_pmt (TsMux * mux, TsMuxProgram * program)
       gst_mpegts_section_unref (program->pmt.section);
 
     program->pmt.section = gst_mpegts_section_from_pmt (pmt, program->pmt_pid);
-    program->pmt.section->version_number = program->pmt_version++;
+    /* HGS */
+    program->pmt_version = pmt_version++;
+    program->pmt.section->version_number = program->pmt_version;
+    /* HGS */
   }
 
   return tsmux_section_write_packet (NULL, &program->pmt, mux);

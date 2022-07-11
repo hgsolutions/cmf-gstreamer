@@ -2324,7 +2324,9 @@ mpegts_packetizer_pts_to_ts (MpegTSPacketizer2 * packetizer,
          * before the start of the current group
          */
         if (PCRTIME_TO_GSTTIME (refpcr) - pts > GST_SECOND) {
-          pts += PCR_GST_MAX_VALUE;
+          /* HGS */
+          pts = PCRTIME_TO_GSTTIME (refpcr);    //pts += PCR_GST_MAX_VALUE;
+          /* HGS */
         } else
           refpcr = G_MAXINT64;
       }

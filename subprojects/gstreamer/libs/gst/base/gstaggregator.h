@@ -73,6 +73,10 @@ struct _GstAggregatorPad
   /* < private > */
   GstAggregatorPadPrivate   *  priv;
 
+  /* HGS - Add flag to identify a pad as a sparse data source */
+  gboolean sparse;
+  /* HGS */
+
   gpointer _gst_reserved[GST_PADDING];
 };
 

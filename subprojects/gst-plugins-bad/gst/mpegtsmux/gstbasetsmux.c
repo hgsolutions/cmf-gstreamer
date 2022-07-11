@@ -78,6 +78,9 @@
 #include <gst/pbutils/pbutils.h>
 #include <gst/videoparsers/gstjpeg2000parse.h>
 #include <gst/video/video-color.h>
+/* HGS */
+#include <gst/codecparsers/gstklvmeta.h>
+/* HGS */
 
 #include "gstbasetsmux.h"
 #include "gstbasetsmuxaac.h"
@@ -350,6 +353,13 @@ gst_base_ts_mux_reset (GstBaseTsMux * mux, gboolean alloc)
   GST_OBJECT_UNLOCK (mux);
 
   if (alloc) {
+    /* HGS */
+    if (mux->video_pids) {
+      g_list_free (mux->video_pids);
+      mux->video_pids = NULL;
+    }
+    /* HGS */
+
     g_assert (klass->create_ts_mux);
 
     mux->tsmux = klass->create_ts_mux (mux);
@@ -575,7 +585,18 @@ gst_base_ts_mux_create_or_update_stream (GstBaseTsMux * mux,
     st = TSMUX_ST_PS_OPUS;
     ts_pad->prepare_func = gst_base_ts_mux_prepare_opus;
   } else if (strcmp (mt, "meta/x-klv") == 0) {
+    /* HGS */
+    gint stream_type;
+    /* HGS */
+
     st = TSMUX_ST_PS_KLV;
+
+    /* HGS */
+    if (gst_structure_get_int (s, "stream_type", &stream_type)) {
+      if (stream_type == TSMUX_ST_METADATA)
+        st = TSMUX_ST_PS_SYNC_KLV;
+    }
+    /* HGS */
   } else if (strcmp (mt, "image/x-jpc") == 0) {
     /*
      * See this document for more details on standard:
@@ -732,6 +753,12 @@ gst_base_ts_mux_create_or_update_stream (GstBaseTsMux * mux,
 
   tsmux_stream_set_buffer_release_func (ts_pad->stream, release_buffer_cb);
 
+  /* HGS */
+  if (g_str_has_prefix (mt, "video/"))
+    mux->video_pids = g_list_append (mux->video_pids,
+        GINT_TO_POINTER (tsmux_stream_get_pid (ts_pad->stream)));
+  /* HGS */
+
   return GST_FLOW_OK;
 
   /* ERRORS */
@@ -780,6 +807,16 @@ gst_base_ts_mux_create_pad_stream (GstBaseTsMux * mux, GstPad * pad)
   gchar *name = NULL;
   gchar *prop_name;
   GstFlowReturn ret = GST_FLOW_OK;
+
+  /* HGS */
+  {
+    GstCaps *caps = gst_pad_get_current_caps (pad);
+    if (caps == NULL)
+      return GST_FLOW_NOT_NEGOTIATED;
+
+    gst_caps_unref (caps);
+  }
+  /* HGS */
 
   if (ts_pad->prog_id == -1) {
     name = GST_PAD_NAME (pad);
@@ -1123,6 +1160,34 @@ new_packet_cb (GstBuffer * buf, void *user_data, gint64 new_pcr)
   GstMapInfo map;
   GstSegment *agg_segment = &GST_AGGREGATOR_PAD (agg->srcpad)->segment;
 
+  /* HGS - Push all existing packets so the next
+   * push starts at the beginning of a video frame
+   */
+  GList *stream_pids = mux->video_pids;
+  guint16 packet_pid;
+
+  gst_buffer_map (buf, &map, GST_MAP_READ);
+
+  packet_pid = ((map.data[1] & 0x1f) << 8) | (map.data[2] & 0xff);
+  while (stream_pids) {
+    if ((map.data[1] & 0x40)
+        && packet_pid == GPOINTER_TO_INT (stream_pids->data)) {
+      gst_base_ts_mux_push_packets (mux, TRUE);
+
+      if (mux->usec_time != GST_CLOCK_TIME_NONE) {
+        GstCaps *caps = gst_caps_new_empty_simple ("application/x-timestamp");
+        gst_buffer_add_reference_timestamp_meta (buf, caps, mux->usec_time, 0);
+        mux->usec_time = GST_CLOCK_TIME_NONE;
+      }
+
+      break;
+    }
+    stream_pids = g_list_next (stream_pids);
+  }
+
+  gst_buffer_unmap (buf, &map);
+  /* HGS */
+
   g_assert (klass->output_packet);
 
   gst_buffer_map (buf, &map, GST_MAP_READWRITE);
@@ -1189,6 +1254,20 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
   gboolean delta = TRUE, header = FALSE;
   StreamData *stream_data;
   GstMpegtsSection *scte_section = NULL;
+  /* HGS */
+  guint new_count = 0;
+  /* HGS */
+
+  /* HGS */
+  {
+    GstCaps *caps = gst_caps_new_empty_simple ("application/x-timestamp");
+    GstReferenceTimestampMeta *meta =
+        gst_buffer_get_reference_timestamp_meta (buf, caps);
+    gst_caps_unref (caps);
+    if (meta)
+      mux->usec_time = meta->timestamp;
+  }
+  /* HGS */
 
   GST_DEBUG_OBJECT (mux, "Pads collected");
 
@@ -1198,6 +1277,12 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
     return GST_FLOW_OK;
   }
 
+  /* HGS */
+  new_count = g_list_length (GST_ELEMENT (mux)->sinkpads);
+  if (new_count > mux->current_stream_count)
+    mux->first = TRUE;
+  /* HGS */
+
   g_mutex_lock (&mux->lock);
   if (G_UNLIKELY (mux->first)) {
     ret = gst_base_ts_mux_create_streams (mux);
@@ -1205,9 +1290,17 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
       if (buf)
         gst_buffer_unref (buf);
       g_mutex_unlock (&mux->lock);
-      return ret;
+      /* HGS */
+      if (ret == GST_FLOW_NOT_NEGOTIATED)
+        return GST_FLOW_OK;
+      else
+        return ret;
+      /* HGS */
     }
 
+    /* HGS */
+    mux->current_stream_count = new_count;
+    /* HGS */
     mux->first = FALSE;
   }
 
@@ -1335,6 +1428,33 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
   }
 
   GST_DEBUG_OBJECT (mux, "delta: %d", delta);
+
+  /* HGS - Get AU header metadata from buffer and add it to the head of buffer data */
+  if (best->stream->stream_type == TSMUX_ST_METADATA) {
+    GstKlvMeta *meta = gst_buffer_get_klv_meta (buf);
+    GstMemory *mem;
+    GstMapInfo map;
+
+    if (meta) {
+      GST_DEBUG ("KLV Data Mux %i %i %i %i", meta->metadata_service_id,
+          meta->sequence_number, meta->flags, meta->au_cell_data_length);
+
+      mem = gst_allocator_alloc (NULL, 5, NULL);
+      if (gst_memory_map (mem, &map, GST_MAP_WRITE)) {
+        map.data[0] = meta->metadata_service_id;
+        map.data[1] = meta->sequence_number;
+        map.data[2] = meta->flags;
+        map.data[3] = (meta->au_cell_data_length & 0xff00) >> 8;
+        map.data[4] = (meta->au_cell_data_length & 0xff);
+
+        gst_memory_unmap (mem, &map);
+        buf = gst_buffer_make_writable (buf);
+        gst_buffer_prepend_memory (buf, mem);
+      }
+      gst_buffer_remove_meta (buf, (GstMeta *) meta);
+    }
+  }
+  /* HGS */
 
   if (gst_buffer_get_size (buf) > 0) {
     stream_data = stream_data_new (buf);
@@ -2076,6 +2196,11 @@ gst_base_ts_mux_sink_event (GstAggregator * agg, GstAggregatorPad * agg_pad,
 
       gst_event_parse_stream_flags (event, &flags);
 
+      /* HGS - Identify pad as a sparse data source */
+      if ((flags & GST_STREAM_FLAG_SPARSE))
+        agg_pad->sparse = TRUE;
+      /* HGS */
+
       /* Don't wait for data on sparse inputs like metadata streams */
       /*
          if ((flags & GST_STREAM_FLAG_SPARSE)) {
@@ -2228,11 +2353,19 @@ gst_base_ts_mux_clip (GstAggregator * agg,
         GST_STIME_FORMAT " running time", GST_TIME_ARGS (GST_BUFFER_DTS (buf)),
         GST_STIME_ARGS (dts));
 
-    if (GST_CLOCK_STIME_IS_VALID (pad->dts) && dts < pad->dts) {
-      /* Ignore DTS going backward */
-      GST_WARNING_OBJECT (pad, "ignoring DTS going backward");
-      dts = pad->dts;
-    }
+    /* HGS - Comment because this causes a major timing error on a file loop
+     * when the pipeline clock gets reset to 0.
+     */
+    /*
+       if (GST_CLOCK_STIME_IS_VALID (pad->dts) && dts < pad->dts) {
+     */
+    /* Ignore DTS going backward */
+    /*
+       GST_WARNING_OBJECT (pad, "ignoring DTS going backward");
+       dts = pad->dts;
+       }
+     */
+    /* HGS */
 
     ret = gst_buffer_make_writable (buf);
     if (sign > 0)
@@ -2723,6 +2856,11 @@ gst_base_ts_mux_init (GstBaseTsMux * mux)
 
   mux->packet_size = GST_BASE_TS_MUX_NORMAL_PACKET_LENGTH;
   mux->automatic_alignment = 0;
+
+  /* HGS */
+  mux->video_pids = NULL;
+  mux->usec_time = GST_CLOCK_TIME_NONE;
+  /* HGS */
 
   g_mutex_init (&mux->lock);
 }

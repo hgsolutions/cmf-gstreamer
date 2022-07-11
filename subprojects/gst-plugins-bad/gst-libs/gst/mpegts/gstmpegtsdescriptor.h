@@ -298,6 +298,19 @@ gboolean  gst_mpegts_descriptor_parse_ca (GstMpegtsDescriptor *descriptor,
 					  const guint8 **private_data,
 					  gsize *private_data_size);
 
+/* HGS */
+/* GST_MTS_DESC_METADATA (0x26) */
+GST_EXPORT
+    GstMpegtsDescriptor *
+gst_mpegts_descriptor_from_metadata (guint application_format, guint format);
+
+/* GST_MTS_DESC_METADATA_STD (0x27) */
+GST_EXPORT
+    GstMpegtsDescriptor *
+gst_mpegts_descriptor_from_metadata_std (guint input_leak_rate,
+    guint buffer_size, guint output_leak_rate);
+/* HGS */
+
 /* GST_MTS_DESC_ISO_639_LANGUAGE (0x0A) */
 /**
  * GstMpegtsISO639AudioType:
