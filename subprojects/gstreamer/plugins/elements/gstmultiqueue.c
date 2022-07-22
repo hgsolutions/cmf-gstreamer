@@ -366,6 +366,7 @@ static gpointer gst_multi_queue_monitor (gpointer);
 GThread *monitor = NULL;
 gboolean monitor_running = FALSE;
 gboolean flushing_queues = FALSE;
+gboolean have_data_flow = FALSE;
 /* HGS */
 
 static guint
@@ -1305,6 +1306,9 @@ gst_multi_queue_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:{
       if (monitor) {
         monitor_running = FALSE;
+        /* HGS */
+        have_data_flow = FALSE;
+        /* HGS */
         g_thread_join (monitor);
         monitor = NULL;
       }
@@ -1420,6 +1424,9 @@ gst_single_queue_flush (GstMultiQueue * mq, GstSingleQueue * sq, gboolean flush,
     /* All pads start off OK for a smooth kick-off */
     sq->srcresult = GST_FLOW_OK;
     sq->pushed = FALSE;
+    /* HGS */
+    sq->recent_push = FALSE;
+    /* HGS */
     sq->cur_time = 0;
     sq->max_size.visible = mq->max_size.visible;
     sq->is_eos = FALSE;
@@ -1494,7 +1501,7 @@ gst_multi_queue_monitor (gpointer data)
   while (monitor_running) {
     /* Check every 5 seconds to see if any
      * buffers are being pushed */
-    if (g_get_monotonic_time () > (last_time + 5000000)) {
+    if (have_data_flow && g_get_monotonic_time () > (last_time + 5000000)) {
       last_time = g_get_monotonic_time ();
       is_pushing = FALSE;
 
@@ -1520,6 +1527,7 @@ gst_multi_queue_monitor (gpointer data)
         }
 
         flushing_queues = FALSE;
+        have_data_flow = FALSE;
       }
     }
     g_usleep (50000);
@@ -2390,7 +2398,7 @@ next:
 
   /* HGS */
   if (is_buffer)
-    sq->recent_push = sq->pushed = TRUE;
+    have_data_flow = sq->recent_push = sq->pushed = TRUE;
   /* HGS */
 
   /* now hold on a bit;

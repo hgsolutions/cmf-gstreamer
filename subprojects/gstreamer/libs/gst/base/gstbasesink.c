@@ -328,6 +328,10 @@ enum
   PROP_LAST
 };
 
+/* HGS */
+gboolean flush_complete = FALSE;
+/* HGS */
+
 static GstElementClass *parent_class = NULL;
 static gint private_offset = 0;
 
@@ -3338,6 +3342,10 @@ gst_base_sink_default_event (GstBaseSink * basesink, GstEvent * event)
     {
       gboolean reset_time;
 
+      /* HGS */
+      flush_complete = TRUE;
+      /* HGS */
+
       gst_event_parse_flush_stop (event, &reset_time);
       GST_DEBUG_OBJECT (basesink, "flush-stop %p, reset_time: %d", event,
           reset_time);
@@ -3822,6 +3830,16 @@ gst_base_sink_chain_unlocked (GstBaseSink * basesink, GstPad * pad,
      * least clip the buffer to the segment */
     gst_base_sink_default_get_times (basesink, sync_buf, &start, &end);
   }
+
+  /* HGS
+   * Dropping buffers if there were any not flushed after seek
+   * if they are too far ahead if scheduled time.
+   */
+  if (basesink->sync && flush_complete && start > segment->start + 20000000000)
+    goto dropped;
+
+  flush_complete = FALSE;
+  /* HGS */
 
   GST_DEBUG_OBJECT (basesink, "got times start: %" GST_TIME_FORMAT
       ", end: %" GST_TIME_FORMAT, GST_TIME_ARGS (start), GST_TIME_ARGS (end));

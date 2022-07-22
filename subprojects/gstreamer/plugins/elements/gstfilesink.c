@@ -146,6 +146,11 @@ gst_fopen (const gchar * filename, const gchar * mode, gboolean o_sync)
   int fd;
   int flags = O_CREAT | O_WRONLY;
 
+  /* HGS */
+  if (!strcmp (filename, "/dev/stdout"))
+    return fdopen (1, "w");
+  /* HGS */
+
   /* NOTE: below code is for handing spurious EACCES return on write
    * See https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/143
    */
