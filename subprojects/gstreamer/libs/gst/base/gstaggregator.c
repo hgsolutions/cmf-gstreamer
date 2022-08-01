@@ -512,15 +512,15 @@ gst_aggregator_check_pads_ready (GstAggregator * self,
 
       /* Only consider this pad as worth waiting for if it's not already EOS.
        * There's no point in waiting for buffers on EOS pads */
-      /* HGS - Comment this section. It's occasionally causes
-       * a lockup of pipeline but works correctly
-       * without this check.
+      /* HGS - Comment have_buffer flag. It's occasionally causes
+       * a lockup of pipeline but works correctly without this. Sleep
+       * is required for CPU control.
        */
-      /*
-         if (!pad->priv->eos)
-         have_buffer = FALSE;
-         else
-       */
+
+      if (!pad->priv->eos)
+        g_usleep (20);
+      //have_buffer = FALSE;
+      //else
       n_ready++;
     } else if (self->priv->peer_latency_live) {
       /* In live mode, having a single pad with buffers is enough to
