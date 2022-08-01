@@ -702,10 +702,15 @@ gst_multiudpsink_send_messages (GstMultiUDPSink * sink, GSocket * socket,
           sent_max_size_warning = FALSE;
         }
       } else {
-        GST_ELEMENT_WARNING (sink, RESOURCE, WRITE,
-            ("Error sending UDP packets"), ("client %s, reason: %s",
-                gst_udp_address_get_string (msg->address, astr, sizeof (astr)),
-                (err != NULL) ? err->message : "unknown reason"));
+        /* HGS - Filter out connection refused messages. For UDP we don't care about these */
+        if (err->code != G_IO_ERROR_CONNECTION_REFUSED) {
+          GST_ELEMENT_WARNING (sink, RESOURCE, WRITE,
+              ("Error sending UDP packets"), ("client %s, reason: %s",
+                  gst_udp_address_get_string (msg->address, astr,
+                      sizeof (astr)),
+                  (err != NULL) ? err->message : "unknown reason"));
+        }
+        /* HGS */
 
         for (i = err_idx + 1; i < num_messages; ++i, ++skip) {
           if (messages[i].address != msg->address)
