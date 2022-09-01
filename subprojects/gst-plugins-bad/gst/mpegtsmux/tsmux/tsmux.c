@@ -1069,8 +1069,10 @@ tsmux_write_ts_header (TsMux * mux, guint8 * buf, TsMuxPacketInfo * pi,
   /* Sync byte */
   buf[0] = TSMUX_SYNC_BYTE;
 
-  TS_DEBUG ("PID 0x%04x, counter = 0x%01x, %u bytes avail", pi->pid,
+  /* HGS */
+  GST_LOG ("PID 0x%04x, counter = 0x%01x, %u bytes avail", pi->pid,
       mux->pid_packet_counts[pi->pid] & 0x0f, stream_avail);
+  /* HGS */
 
   /* 3 bits:
    *   transport_error_indicator
@@ -1142,7 +1144,7 @@ tsmux_write_ts_header (TsMux * mux, guint8 * buf, TsMuxPacketInfo * pi,
     TS_DEBUG ("Adaptation field of size >= %d + %d bytes payload",
         adapt_len, payload_len);
   } else {
-    TS_DEBUG ("Payload of %d bytes only", payload_len);
+    GST_LOG ("Payload of %d bytes only", payload_len);
   }
 
   return TRUE;
@@ -1647,7 +1649,9 @@ tsmux_write_stream_packet (TsMux * mux, TsMuxStream * stream)
 
   gst_buffer_unmap (buf, &map);
 
-  GST_DEBUG ("Writing PES of size %d", (int) gst_buffer_get_size (buf));
+  /* HGS */
+  GST_LOG ("Writing PES of size %d", (int) gst_buffer_get_size (buf));
+  /* HGS */
   res = tsmux_packet_out (mux, buf, new_pcr);
 
   /* Reset all dynamic flags */

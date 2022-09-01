@@ -2431,9 +2431,11 @@ gst_base_ts_mux_find_best_pad (GstAggregator * aggregator)
 
   GST_OBJECT_UNLOCK (aggregator);
 
-  GST_DEBUG_OBJECT (aggregator,
+  /* HGS */
+  GST_LOG_OBJECT (aggregator,
       "Best pad found with %" GST_TIME_FORMAT ": %" GST_PTR_FORMAT,
       GST_TIME_ARGS (best_ts), best);
+  /* HGS */
 
   return best;
 }
