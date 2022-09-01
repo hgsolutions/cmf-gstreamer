@@ -518,10 +518,10 @@ gst_aggregator_check_pads_ready (GstAggregator * self,
        */
 
       if (!pad->priv->eos)
-        g_usleep (20);
+        g_usleep (100);
       //have_buffer = FALSE;
-      //else
-      n_ready++;
+      else
+        n_ready++;
     } else if (self->priv->peer_latency_live) {
       /* In live mode, having a single pad with buffers is enough to
        * generate a start time from it. In non-live mode all pads need
