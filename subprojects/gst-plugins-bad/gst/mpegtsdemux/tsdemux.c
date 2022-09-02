@@ -1498,6 +1498,9 @@ create_pad_for_stream (MpegTSBase * base, MpegTSBaseStream * bstream,
         gst_caps_set_simple (caps, "layer", G_TYPE_INT, 2, NULL);
       break;
     case GST_MPEGTS_STREAM_TYPE_PRIVATE_PES_PACKETS:
+    /* HGS */
+    case GST_MPEGTS_STREAM_TYPE_METADATA_PES_PACKETS:
+    /* HGS */
       GST_LOG_OBJECT (demux, "private data");
       /* FIXME: Move all of this into a common method (there might be other
        * types also, depending on registratino descriptors also
