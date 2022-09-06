@@ -1025,8 +1025,8 @@ flac_type_find (GstTypeFind * tf, gpointer unused)
     return;
   }
 
-/* disabled because it happily typefinds /dev/urandom as audio/x-flac, and
- * because I yet have to see header-less flac in the wild */
+  /* disabled because it happily typefinds /dev/urandom as audio/x-flac, and
+   * because I yet have to see header-less flac in the wild */
 #if 0
   /* flac without headers (subset format) */
   /* 64K should be enough */
@@ -4834,24 +4834,24 @@ ogganx_type_find (GstTypeFind * tf, gpointer private)
     GstOggStreamType stream_type;
   } markers[] = {
     {
-    "\001vorbis", 7, OGG_AUDIO}, {
-    "\200theora", 7, OGG_VIDEO}, {
-    "fLaC", 4, OGG_AUDIO}, {
-    "\177FLAC", 5, OGG_AUDIO}, {
-    "Speex", 5, OGG_AUDIO}, {
-    "CMML\0\0\0\0", 8, OGG_OTHER}, {
-    "PCM     ", 8, OGG_AUDIO}, {
-    "Annodex", 7, OGG_ANNODEX}, {
-    "fishead", 7, OGG_SKELETON}, {
-    "AnxData", 7, OGG_ANNODEX}, {
-    "CELT    ", 8, OGG_AUDIO}, {
-    "\200kate\0\0\0", 8, OGG_KATE}, {
-    "BBCD\0", 5, OGG_VIDEO}, {
-    "OVP80\1\1", 7, OGG_VIDEO}, {
-    "OpusHead", 8, OGG_AUDIO}, {
-    "\001audio\0\0\0", 9, OGG_AUDIO}, {
-    "\001video\0\0\0", 9, OGG_VIDEO}, {
-    "\001text\0\0\0", 9, OGG_OTHER}
+        "\001vorbis", 7, OGG_AUDIO}, {
+        "\200theora", 7, OGG_VIDEO}, {
+        "fLaC", 4, OGG_AUDIO}, {
+        "\177FLAC", 5, OGG_AUDIO}, {
+        "Speex", 5, OGG_AUDIO}, {
+        "CMML\0\0\0\0", 8, OGG_OTHER}, {
+        "PCM     ", 8, OGG_AUDIO}, {
+        "Annodex", 7, OGG_ANNODEX}, {
+        "fishead", 7, OGG_SKELETON}, {
+        "AnxData", 7, OGG_ANNODEX}, {
+        "CELT    ", 8, OGG_AUDIO}, {
+        "\200kate\0\0\0", 8, OGG_KATE}, {
+        "BBCD\0", 5, OGG_VIDEO}, {
+        "OVP80\1\1", 7, OGG_VIDEO}, {
+        "OpusHead", 8, OGG_AUDIO}, {
+        "\001audio\0\0\0", 9, OGG_AUDIO}, {
+        "\001video\0\0\0", 9, OGG_VIDEO}, {
+        "\001text\0\0\0", 9, OGG_OTHER}
   };
 
   while (c.offset < 4096 && data_scan_ctx_ensure_data (tf, &c, 64)) {
@@ -5956,7 +5956,36 @@ aa_type_find (GstTypeFind * tf, gpointer private)
   }
 }
 
+/* HGS */
+/*** meta/x-klv ***/
+/* SMPTE 336M-2007 - 4 byte prefix for universal label key
+ * MISB ST1402.2 - MPEG-2 Transport Stream for Class 1/Class 2 Motion Imagery, Audio and Metadata
+ */
+static GstStaticCaps klv_caps = GST_STATIC_CAPS ("meta/x-klv");
+#define KLV_CAPS gst_static_caps_get(&klv_caps)
+
+static void
+klv_type_find (GstTypeFind * tf, gpointer ununsed)
+{
+  const guint8 *data = gst_type_find_peek (tf, 0, 9);
+  guint8 header[4] = { 0x06, 0x0E, 0x2B, 0x34 };
+
+  if (data) {
+    if (memcmp (data, header, 4) == 0) {
+      gst_type_find_suggest (tf, GST_TYPE_FIND_MAXIMUM, KLV_CAPS);
+    } else if (memcmp (data + 5, header, 4) == 0) {     //Check for MPEG2-TS synchronous metadata per MISB ST1402.2 section 9.4.1
+      gst_type_find_suggest (tf, GST_TYPE_FIND_MAXIMUM, KLV_CAPS);
+    }
+  }
+}
+
+/* HGS */
+
 /*Type find definition by functions */
+/* HGS */
+GST_TYPE_FIND_REGISTER_DEFINE (klv, "meta/x-klv", GST_RANK_PRIMARY,
+    klv_type_find, "klv", KLV_CAPS, NULL, NULL);
+/* HGS */
 GST_TYPE_FIND_REGISTER_DEFINE (musepack, "audio/x-musepack", GST_RANK_PRIMARY,
     musepack_type_find, "mpc,mpp,mp+", MUSEPACK_CAPS, NULL, NULL);
 GST_TYPE_FIND_REGISTER_DEFINE (au, "audio/x-au", GST_RANK_MARGINAL,

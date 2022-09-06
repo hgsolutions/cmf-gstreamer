@@ -203,6 +203,9 @@ plugin_init (GstPlugin * plugin)
   GST_TYPE_FIND_REGISTER (pva, plugin);
   GST_TYPE_FIND_REGISTER (aa, plugin);
   GST_TYPE_FIND_REGISTER (tap, plugin);
+  /* HGS */
+  GST_TYPE_FIND_REGISTER (klv, plugin);
+  /* HGS */
 
   return TRUE;
 }
