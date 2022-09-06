@@ -751,6 +751,17 @@ gst_base_ts_mux_create_or_update_stream (GstBaseTsMux * mux,
 
   ts_pad->stream->opus_channel_config_code = opus_channel_config_code;
 
+  /* HGS */
+  gst_structure_get_int (s, "application_format",
+      &ts_pad->stream->application_format);
+  gst_structure_get_int (s, "format", &ts_pad->stream->format);
+  gst_structure_get_int (s, "input_leak_rate",
+      &ts_pad->stream->input_leak_rate);
+  gst_structure_get_int (s, "buffer_size", &ts_pad->stream->buffer_size);
+  gst_structure_get_int (s, "output_leak_rate",
+      &ts_pad->stream->output_leak_rate);
+  /* HGS */
+
   tsmux_stream_set_buffer_release_func (ts_pad->stream, release_buffer_cb);
 
   /* HGS */

@@ -1023,6 +1023,9 @@ tsmux_stream_default_get_es_descrs (TsMuxStream * stream,
        * that should never happen anyway as
        * dvb subtitles are private data */
     case TSMUX_ST_PRIVATE_DATA:
+      /* HGS */
+    case TSMUX_ST_METADATA:
+      /* HGS */
       if (stream->is_dvb_sub) {
         GST_DEBUG ("Stream language %s", stream->language);
         /* Simple DVB subtitles with no monitor aspect ratio critical

@@ -588,7 +588,27 @@ get_registration_from_descriptors (GPtrArray * descriptors)
     } else
       return GST_READ_UINT32_BE (desc->data + 2);
   }
+  /* HGS */
+  /* ISO/IEC 13818-1:2013 Table 2-86 Metadata descriptor */
+  else if ((desc =
+          gst_mpegts_find_descriptor (descriptors, GST_MTS_DESC_METADATA))) {
+    if (G_UNLIKELY (desc->length < 9)) {
+      GST_WARNING ("Metadata descriptor with length < 9. (Corrupted ?)");
+    } else {
+      int offset = 2;
 
+      if (GST_READ_UINT16_BE (desc->data + offset) == 0xFFFF)   //read metadata_application_format
+        offset += 4;            //skip metadata_application_format_identifier
+
+      offset += 2;              //skip metadata_application_format
+
+      if (GST_READ_UINT8 (desc->data + offset) == 0xFF) {       //read metadata_format
+        offset += 1;            //skip metadata_format
+        return GST_READ_UINT32_BE (desc->data + offset);        //read metadata_format_identifier
+      }
+    }
+  }
+  /* HGS */
   return 0;
 }
 
@@ -1838,8 +1858,8 @@ mpegts_base_handle_seek_event (MpegTSBase * base, GstPad * pad,
       " stop: %" GST_TIME_FORMAT, rate, GST_TIME_ARGS (start),
       GST_TIME_ARGS (stop));
 
-  flush = ! !(flags & GST_SEEK_FLAG_FLUSH);
-  instant_rate_change = ! !(flags & GST_SEEK_FLAG_INSTANT_RATE_CHANGE);
+  flush = !!(flags & GST_SEEK_FLAG_FLUSH);
+  instant_rate_change = !!(flags & GST_SEEK_FLAG_INSTANT_RATE_CHANGE);
 
   /* Directly send the instant-rate-change event here before taking the
    * stream-lock so that it can be applied as soon as possible */

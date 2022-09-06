@@ -673,8 +673,10 @@ tsmux_program_set_pcr_stream (TsMuxProgram * program, TsMuxStream * stream)
 {
   g_return_if_fail (program != NULL);
 
-  if (program->pcr_stream == stream)
+  /* HGS */
+  if (program->pcr_stream == stream || stream->is_meta == TRUE)
     return;
+  /* HGS */
 
   if (program->pcr_stream != NULL)
     tsmux_stream_pcr_unref (program->pcr_stream);
@@ -752,6 +754,13 @@ tsmux_create_stream (TsMux * mux, guint stream_type, guint16 pid,
     stream->language[0] = 0;
   }
 
+  /* HGS */
+  stream->application_format = 256;
+  stream->format = 255;
+  stream->input_leak_rate = 0;
+  stream->buffer_size = 0;
+  stream->output_leak_rate = 0;
+  /* HGS */
   return stream;
 }
 
