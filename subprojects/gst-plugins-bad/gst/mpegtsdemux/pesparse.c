@@ -175,12 +175,13 @@ mpegts_parse_pes_header (const guint8 * data, gsize length, PESHeader * res)
 
   /* HGS - Apply timestamps to PES headers that don't
    * have one set. Used primarily for async KLV */
+  if (res->DTS != -1 || res->PTS != -1)
+    last_ts = res->DTS == -1 ? res->PTS : res->DTS;
+
   if (res->PTS == -1)
     res->PTS = last_ts;
   if (res->DTS == -1)
     res->DTS = last_ts;
-  else
-    last_ts = res->DTS;
   /* HGS */
 
   if (flags & 0x20) {
