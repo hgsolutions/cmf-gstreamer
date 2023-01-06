@@ -1296,11 +1296,11 @@ gst_multi_queue_change_state (GstElement * element, GstStateChange transition)
     }
       /* HGS */
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:{
-      if (monitor == NULL) {
-        monitor_running = TRUE;
-        monitor = g_thread_new ("Blocked Queue Monitor",
-            gst_multi_queue_monitor, mqueue);
-      }
+      /*if (monitor == NULL) {
+         monitor_running = TRUE;
+         monitor = g_thread_new ("Blocked Queue Monitor",
+         gst_multi_queue_monitor, mqueue);
+         } */
       break;
     }
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:{
