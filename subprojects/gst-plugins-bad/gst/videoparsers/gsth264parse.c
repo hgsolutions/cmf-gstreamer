@@ -781,7 +781,7 @@ gst_h264_parse_process_sei (GstH264Parse * h264parse, GstH264NalUnit * nalu)
               if (sei.payload.frame_packing.spatial_flipping_flag) {
                 /* One of the views is flopped. */
                 if (sei.payload.frame_packing.frame0_flipped_flag !=
-                    ! !(mview_flags &
+                    !!(mview_flags &
                         GST_VIDEO_MULTIVIEW_FLAGS_RIGHT_VIEW_FIRST))
                   /* the left view is flopped */
                   mview_flags |= GST_VIDEO_MULTIVIEW_FLAGS_LEFT_FLOPPED;
@@ -794,7 +794,7 @@ gst_h264_parse_process_sei (GstH264Parse * h264parse, GstH264NalUnit * nalu)
               if (sei.payload.frame_packing.spatial_flipping_flag) {
                 /* One of the views is flipped, */
                 if (sei.payload.frame_packing.frame0_flipped_flag !=
-                    ! !(mview_flags &
+                    !!(mview_flags &
                         GST_VIDEO_MULTIVIEW_FLAGS_RIGHT_VIEW_FIRST))
                   /* the left view is flipped */
                   mview_flags |= GST_VIDEO_MULTIVIEW_FLAGS_LEFT_FLIPPED;
@@ -1051,13 +1051,7 @@ gst_h264_parse_process_nal (GstH264Parse * h264parse, GstH264NalUnit * nalu)
       h264parse->state &= GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS;
       if (!GST_H264_PARSE_STATE_VALID (h264parse,
               GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS))
-        /* HGS - We won't return FALSE if we have no SPS/PPS because it can cause collect
-         * pads in muxer to block while waiting on data and filling up buffers from other streams.
-         */
-        GST_DEBUG_OBJECT (h264parse,
-            "Waiting on valid SPS/PPS but passing slice anyhow.");
-      //return FALSE;
-      /* HGS */
+        return FALSE;
 
       /* This is similar to the GOT_SLICE state, but is only reset when the
        * AU is complete. This is used to keep track of AU */
@@ -1091,24 +1085,6 @@ gst_h264_parse_process_nal (GstH264Parse * h264parse, GstH264NalUnit * nalu)
         h264parse->state |= GST_H264_PARSE_STATE_GOT_SLICE;
         h264parse->field_pic_flag = slice.field_pic_flag;
       }
-
-      /* HGS */
-      {
-        static gint frame_count = 1;
-
-        if (nal_type == GST_H264_NAL_SLICE_IDR)
-          frame_count = 1;
-
-        if (h264parse->interval > 0 && h264parse->frame_start) {
-          if (frame_count > h264parse->interval) {
-            h264parse->push_codec = TRUE;
-            h264parse->header = TRUE;
-            frame_count = 1;
-          }
-          frame_count++;
-        }
-      }
-      /* HGS */
 
       if (G_LIKELY (nal_type != GST_H264_NAL_SLICE_IDR &&
               !h264parse->push_codec))
@@ -3196,40 +3172,43 @@ gst_h264_parse_pre_push_frame (GstBaseParse * parse, GstBaseParseFrame * frame)
       initial_frame = TRUE;
     }
 
-    if (h264parse->idr_pos >= 0) {
-      GST_LOG_OBJECT (h264parse, "IDR nal at offset %d", h264parse->idr_pos);
+    /* HGS - Don't wait for key frame if pushing SPS/PPS at defined intervals so
+     *       that
+     */
+    //if (h264parse->idr_pos >= 0) {
+    GST_LOG_OBJECT (h264parse, "IDR nal at offset %d", h264parse->idr_pos);
 
-      if (timestamp > h264parse->last_report)
-        diff = timestamp - h264parse->last_report;
-      else
-        diff = 0;
+    if (timestamp > h264parse->last_report)
+      diff = timestamp - h264parse->last_report;
+    else
+      diff = 0;
 
-      GST_LOG_OBJECT (h264parse,
-          "now %" GST_TIME_FORMAT ", last SPS/PPS %" GST_TIME_FORMAT,
-          GST_TIME_ARGS (timestamp), GST_TIME_ARGS (h264parse->last_report));
+    GST_LOG_OBJECT (h264parse,
+        "now %" GST_TIME_FORMAT ", last SPS/PPS %" GST_TIME_FORMAT,
+        GST_TIME_ARGS (timestamp), GST_TIME_ARGS (h264parse->last_report));
 
-      GST_DEBUG_OBJECT (h264parse,
-          "interval since last SPS/PPS %" GST_TIME_FORMAT,
-          GST_TIME_ARGS (diff));
+    GST_DEBUG_OBJECT (h264parse,
+        "interval since last SPS/PPS %" GST_TIME_FORMAT, GST_TIME_ARGS (diff));
 
-      if (GST_TIME_AS_SECONDS (diff) >= h264parse->interval ||
-          initial_frame || h264parse->push_codec) {
-        GstClockTime new_ts;
+    if (GST_TIME_AS_SECONDS (diff) >= h264parse->interval ||
+        initial_frame || h264parse->push_codec) {
+      GstClockTime new_ts;
 
-        /* avoid overwriting a perfectly fine timestamp */
-        new_ts = GST_CLOCK_TIME_IS_VALID (timestamp) ? timestamp :
-            h264parse->last_report;
+      /* avoid overwriting a perfectly fine timestamp */
+      new_ts = GST_CLOCK_TIME_IS_VALID (timestamp) ? timestamp :
+          h264parse->last_report;
 
-        if (gst_h264_parse_handle_sps_pps_nals (h264parse, buffer, frame)) {
-          h264parse->last_report = new_ts;
-        }
+      if (gst_h264_parse_handle_sps_pps_nals (h264parse, buffer, frame)) {
+        h264parse->last_report = new_ts;
       }
-      /* we pushed whatever we had */
-      h264parse->push_codec = FALSE;
-      h264parse->have_sps = FALSE;
-      h264parse->have_pps = FALSE;
-      h264parse->state &= GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS;
     }
+    /* we pushed whatever we had */
+    h264parse->push_codec = FALSE;
+    h264parse->have_sps = FALSE;
+    h264parse->have_pps = FALSE;
+    h264parse->state &= GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS;
+    //}
+    /* HGS */
   } else if (h264parse->interval == -1) {
     if (h264parse->idr_pos >= 0) {
       GST_LOG_OBJECT (h264parse, "IDR nal at offset %d", h264parse->idr_pos);
