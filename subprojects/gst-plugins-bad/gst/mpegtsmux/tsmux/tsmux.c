@@ -674,7 +674,7 @@ tsmux_program_set_pcr_stream (TsMuxProgram * program, TsMuxStream * stream)
   g_return_if_fail (program != NULL);
 
   /* HGS */
-  if (program->pcr_stream == stream || stream->is_meta == TRUE)
+  if (!stream || program->pcr_stream == stream || stream->is_meta == TRUE)
     return;
   /* HGS */
 
