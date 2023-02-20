@@ -33,6 +33,7 @@
 #include "gsth264parse.h"
 
 #include <string.h>
+#include <stdio.h>
 
 GST_DEBUG_CATEGORY (h264_parse_debug);
 #define GST_CAT_DEFAULT h264_parse_debug
@@ -275,7 +276,8 @@ gst_h264_parse_reset_stream_info (GstH264Parse * h264parse)
   h264parse->push_codec = FALSE;
   h264parse->first_frame = TRUE;
 
-  gst_buffer_replace (&h264parse->codec_data, NULL);
+   /*HGS*/ h264parse->frame_count = 1;
+   /*HGS*/ gst_buffer_replace (&h264parse->codec_data, NULL);
   gst_buffer_replace (&h264parse->codec_data_in, NULL);
 
   gst_h264_parse_reset_frame (h264parse);
@@ -1085,6 +1087,21 @@ gst_h264_parse_process_nal (GstH264Parse * h264parse, GstH264NalUnit * nalu)
         h264parse->state |= GST_H264_PARSE_STATE_GOT_SLICE;
         h264parse->field_pic_flag = slice.field_pic_flag;
       }
+
+      /* HGS */
+      {
+        if (h264parse->interval > 0 && h264parse->frame_start
+            && slice.first_mb_in_slice == 0) {
+          if (h264parse->frame_count >= h264parse->interval) {
+            h264parse->push_codec = TRUE;
+            h264parse->idr_pos = -1;
+            h264parse->frame_count = 1;
+          } else {
+            h264parse->frame_count++;
+          }
+        }
+      }
+      /* HGS */
 
       if (G_LIKELY (nal_type != GST_H264_NAL_SLICE_IDR &&
               !h264parse->push_codec))
@@ -3161,80 +3178,31 @@ gst_h264_parse_pre_push_frame (GstBaseParse * parse, GstBaseParseFrame * frame)
   }
 
   /* periodic SPS/PPS sending */
-  if (h264parse->interval > 0 || h264parse->push_codec) {
-    GstClockTime timestamp = GST_BUFFER_TIMESTAMP (buffer);
-    guint64 diff;
-    gboolean initial_frame = FALSE;
-
-    /* init */
-    if (!GST_CLOCK_TIME_IS_VALID (h264parse->last_report)) {
-      h264parse->last_report = timestamp;
-      initial_frame = TRUE;
-    }
-
-    /* HGS - Don't wait for key frame if pushing SPS/PPS at defined intervals so
-     *       that
-     */
-    //if (h264parse->idr_pos >= 0) {
+   /*HGS*/ if (h264parse->idr_pos >= 0) {
     GST_LOG_OBJECT (h264parse, "IDR nal at offset %d", h264parse->idr_pos);
 
-    if (timestamp > h264parse->last_report)
-      diff = timestamp - h264parse->last_report;
-    else
-      diff = 0;
+    gst_h264_parse_handle_sps_pps_nals (h264parse, buffer, frame);
 
-    GST_LOG_OBJECT (h264parse,
-        "now %" GST_TIME_FORMAT ", last SPS/PPS %" GST_TIME_FORMAT,
-        GST_TIME_ARGS (timestamp), GST_TIME_ARGS (h264parse->last_report));
-
-    GST_DEBUG_OBJECT (h264parse,
-        "interval since last SPS/PPS %" GST_TIME_FORMAT, GST_TIME_ARGS (diff));
-
-    if (GST_TIME_AS_SECONDS (diff) >= h264parse->interval ||
-        initial_frame || h264parse->push_codec) {
-      GstClockTime new_ts;
-
-      /* avoid overwriting a perfectly fine timestamp */
-      new_ts = GST_CLOCK_TIME_IS_VALID (timestamp) ? timestamp :
-          h264parse->last_report;
-
-      if (gst_h264_parse_handle_sps_pps_nals (h264parse, buffer, frame)) {
-        h264parse->last_report = new_ts;
-      }
-    }
     /* we pushed whatever we had */
     h264parse->push_codec = FALSE;
     h264parse->have_sps = FALSE;
     h264parse->have_pps = FALSE;
     h264parse->state &= GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS;
-    //}
-    /* HGS */
-  } else if (h264parse->interval == -1) {
-    if (h264parse->idr_pos >= 0) {
-      GST_LOG_OBJECT (h264parse, "IDR nal at offset %d", h264parse->idr_pos);
-
-      gst_h264_parse_handle_sps_pps_nals (h264parse, buffer, frame);
-
-      /* we pushed whatever we had */
-      h264parse->push_codec = FALSE;
-      h264parse->have_sps = FALSE;
-      h264parse->have_pps = FALSE;
-      h264parse->state &= GST_H264_PARSE_STATE_VALID_PICTURE_HEADERS;
-    }
+    h264parse->frame_count = 1;
   }
-
-  /* Fixme: setting passthrough mode causing multiple issues:
-   * For nal aligned multiresoluton streams, passthrough mode make h264parse
-   * unable to advertise the new resolutions. Also causing issues while
-   * parsing MVC streams when it has two layers.
-   * Disabing passthourgh mode for now */
+  /*HGS*/
+      /* Fixme: setting passthrough mode causing multiple issues:
+       * For nal aligned multiresoluton streams, passthrough mode make h264parse
+       * unable to advertise the new resolutions. Also causing issues while
+       * parsing MVC streams when it has two layers.
+       * Disabing passthourgh mode for now */
 #if 0
-  /* If SPS/PPS and a keyframe have been parsed, and we're not converting,
-   * we might switch to passthrough mode now on the basis that we've seen
-   * the SEI packets and know optional caps params (such as multiview).
-   * This is an efficiency optimisation that relies on stream properties
-   * remaining uniform in practice. */
-  if (h264parse->can_passthrough) {
+      /* If SPS/PPS and a keyframe have been parsed, and we're not converting,
+       * we might switch to passthrough mode now on the basis that we've seen
+       * the SEI packets and know optional caps params (such as multiview).
+       * This is an efficiency optimisation that relies on stream properties
+       * remaining uniform in practice. */
+      if (h264parse->can_passthrough) {
     if (h264parse->keyframe && h264parse->have_sps && h264parse->have_pps) {
       GST_LOG_OBJECT (parse, "Switching to passthrough mode");
       gst_base_parse_set_passthrough (parse, TRUE);

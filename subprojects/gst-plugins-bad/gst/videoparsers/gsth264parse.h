@@ -166,6 +166,10 @@ struct _GstH264Parse
 
   /* For forward predicted trickmode */
   gboolean discard_bidirectional;
+
+  /*HGS*/
+  gint frame_count;
+  /*HGS*/
 };
 
 struct _GstH264ParseClass

@@ -235,7 +235,8 @@ gst_h265_parse_reset_stream_info (GstH265Parse * h265parse)
   h265parse->push_codec = FALSE;
   h265parse->first_frame = TRUE;
 
-  gst_buffer_replace (&h265parse->codec_data, NULL);
+   /*HGS*/ h265parse->frame_count = 1;
+   /*HGS*/ gst_buffer_replace (&h265parse->codec_data, NULL);
   gst_buffer_replace (&h265parse->codec_data_in, NULL);
 
   gst_h265_parse_reset_frame (h265parse);
@@ -938,18 +939,15 @@ gst_h265_parse_process_nal (GstH265Parse * h265parse, GstH265NalUnit * nalu)
 
       /* HGS */
       {
-        static gint frame_count = 1;
-
-        if (GST_H265_IS_NAL_TYPE_IDR (nal_type))
-          frame_count = 1;
-
-        if (h265parse->interval > 0 && h265parse->picture_start) {
-          if (frame_count > h265parse->interval) {
+        if (h265parse->interval > 0
+            && slice.first_slice_segment_in_pic_flag == 1) {
+          if (h265parse->frame_count >= h265parse->interval) {
             h265parse->push_codec = TRUE;
-            h265parse->header = TRUE;
-            frame_count = 1;
+            h265parse->idr_pos = -1;
+            h265parse->frame_count = 1;
+          } else {
+            h265parse->frame_count++;
           }
-          frame_count++;
         }
       }
       /* HGS */
@@ -2877,69 +2875,20 @@ gst_h265_parse_pre_push_frame (GstBaseParse * parse, GstBaseParseFrame * frame)
   }
 
   /* periodic VPS/SPS/PPS sending */
-  if (h265parse->interval > 0 || h265parse->push_codec) {
-    GstClockTime timestamp = GST_BUFFER_TIMESTAMP (buffer);
-    guint64 diff;
-    gboolean initial_frame = FALSE;
+   /*HGS*/ if (h265parse->idr_pos >= 0) {
+    GST_LOG_OBJECT (h265parse, "IDR nal at offset %d", h265parse->idr_pos);
 
-    /* init */
-    if (!GST_CLOCK_TIME_IS_VALID (h265parse->last_report)) {
-      h265parse->last_report = timestamp;
-      initial_frame = TRUE;
-    }
+    gst_h265_parse_handle_vps_sps_pps_nals (h265parse, buffer, frame);
 
-    if (h265parse->idr_pos >= 0) {
-      GST_LOG_OBJECT (h265parse, "IDR nal at offset %d", h265parse->idr_pos);
-
-      if (timestamp > h265parse->last_report)
-        diff = timestamp - h265parse->last_report;
-      else
-        diff = 0;
-
-      GST_LOG_OBJECT (h265parse,
-          "now %" GST_TIME_FORMAT ", last VPS/SPS/PPS %" GST_TIME_FORMAT,
-          GST_TIME_ARGS (timestamp), GST_TIME_ARGS (h265parse->last_report));
-
-      GST_DEBUG_OBJECT (h265parse,
-          "interval since last VPS/SPS/PPS %" GST_TIME_FORMAT,
-          GST_TIME_ARGS (diff));
-
-      if (GST_TIME_AS_SECONDS (diff) >= h265parse->interval ||
-          initial_frame || h265parse->push_codec) {
-        GstClockTime new_ts;
-
-        /* avoid overwriting a perfectly fine timestamp */
-        new_ts = GST_CLOCK_TIME_IS_VALID (timestamp) ? timestamp :
-            h265parse->last_report;
-
-        if (gst_h265_parse_handle_vps_sps_pps_nals (h265parse, buffer, frame)) {
-          h265parse->last_report = new_ts;
-        }
-      }
-
-      /* we pushed whatever we had */
-      h265parse->push_codec = FALSE;
-      h265parse->have_vps = FALSE;
-      h265parse->have_sps = FALSE;
-      h265parse->have_pps = FALSE;
-      h265parse->state &= GST_H265_PARSE_STATE_VALID_PICTURE_HEADERS;
-    }
-  } else if (h265parse->interval == -1) {
-    if (h265parse->idr_pos >= 0) {
-      GST_LOG_OBJECT (h265parse, "IDR nal at offset %d", h265parse->idr_pos);
-
-      gst_h265_parse_handle_vps_sps_pps_nals (h265parse, buffer, frame);
-
-      /* we pushed whatever we had */
-      h265parse->push_codec = FALSE;
-      h265parse->have_vps = FALSE;
-      h265parse->have_sps = FALSE;
-      h265parse->have_pps = FALSE;
-      h265parse->state &= GST_H265_PARSE_STATE_VALID_PICTURE_HEADERS;
-    }
+    /* we pushed whatever we had */
+    h265parse->push_codec = FALSE;
+    h265parse->have_vps = FALSE;
+    h265parse->have_sps = FALSE;
+    h265parse->have_pps = FALSE;
+    h265parse->state &= GST_H265_PARSE_STATE_VALID_PICTURE_HEADERS;
+    h265parse->frame_count = 1;
   }
-
-  if (frame->out_buffer) {
+  /*HGS*/ if (frame->out_buffer) {
     parse_buffer = frame->out_buffer =
         gst_buffer_make_writable (frame->out_buffer);
   } else {

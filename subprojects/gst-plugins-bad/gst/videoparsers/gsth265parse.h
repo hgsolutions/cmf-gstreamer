@@ -130,6 +130,10 @@ struct _GstH265Parse
 
   /* For forward predicted trickmode */
   gboolean discard_bidirectional;
+
+  /*HGS*/
+  gint frame_count;
+  /*HGS*/
 };
 
 struct _GstH265ParseClass
