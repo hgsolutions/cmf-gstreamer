@@ -159,7 +159,8 @@ tsmux_new (void)
 
   mux->first_pcr_ts = G_MININT64;
 
-  return mux;
+   /*HGS*/ mux->write_pat = FALSE;
+   /*HGS*/ return mux;
 }
 
 /**
@@ -1260,7 +1261,12 @@ tsmux_section_write_packet (gpointer unused_arg,
       gst_buffer_append_memory (packet_buffer, extra);
     }
 
-    TS_DEBUG ("Writing %d bytes to section. %d bytes remaining",
+     /*HGS*/ if (mux->write_pat) {
+      GST_BUFFER_FLAG_SET (packet_buffer, GST_BUFFER_FLAG_LAST);
+      mux->write_pat = FALSE;
+    }
+    /*HGS*/
+        TS_DEBUG ("Writing %d bytes to section. %d bytes remaining",
         len, section->pi.stream_avail - len);
 
     /* Push the packet without PCR */
@@ -1767,7 +1773,8 @@ tsmux_write_pat (TsMux * mux)
     mux->pat_changed = FALSE;
   }
 
-  return tsmux_section_write_packet (NULL, &mux->pat, mux);
+  /*HGS*/ mux->write_pat = TRUE;
+   /*HGS*/ return tsmux_section_write_packet (NULL, &mux->pat, mux);
 }
 
 static gboolean

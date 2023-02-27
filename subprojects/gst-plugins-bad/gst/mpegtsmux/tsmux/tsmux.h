@@ -189,6 +189,10 @@ struct TsMux {
   guint8 pid_packet_counts[8192];
 
   gint64 first_pcr_ts;
+
+  /*HGS*/
+  gboolean write_pat;
+  /*HGS*/
 };
 
 /* create/free new muxer session */

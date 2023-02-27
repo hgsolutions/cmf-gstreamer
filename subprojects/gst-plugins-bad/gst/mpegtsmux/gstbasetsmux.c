@@ -1174,29 +1174,38 @@ new_packet_cb (GstBuffer * buf, void *user_data, gint64 new_pcr)
   /* HGS - Push all existing packets so the next
    * push starts at the beginning of a video frame
    */
-  GList *stream_pids = mux->video_pids;
-  guint16 packet_pid;
+  if (GST_BUFFER_FLAG_IS_SET (buf, GST_BUFFER_FLAG_LAST)) {
+    gst_base_ts_mux_push_packets (mux, TRUE);
 
-  gst_buffer_map (buf, &map, GST_MAP_READ);
-
-  packet_pid = ((map.data[1] & 0x1f) << 8) | (map.data[2] & 0xff);
-  while (stream_pids) {
-    if ((map.data[1] & 0x40)
-        && packet_pid == GPOINTER_TO_INT (stream_pids->data)) {
-      gst_base_ts_mux_push_packets (mux, TRUE);
-
-      if (mux->usec_time != GST_CLOCK_TIME_NONE) {
-        GstCaps *caps = gst_caps_new_empty_simple ("application/x-timestamp");
-        gst_buffer_add_reference_timestamp_meta (buf, caps, mux->usec_time, 0);
-        mux->usec_time = GST_CLOCK_TIME_NONE;
-      }
-
-      break;
+    if (mux->usec_time != GST_CLOCK_TIME_NONE) {
+      GstCaps *caps = gst_caps_new_empty_simple ("application/x-timestamp");
+      gst_buffer_add_reference_timestamp_meta (buf, caps, mux->usec_time, 0);
+      mux->usec_time = GST_CLOCK_TIME_NONE;
     }
-    stream_pids = g_list_next (stream_pids);
   }
 
-  gst_buffer_unmap (buf, &map);
+  /*GList *stream_pids = mux->video_pids;
+     guint16 packet_pid;
+     gst_buffer_map (buf, &map, GST_MAP_READ);
+
+     packet_pid = ((map.data[1] & 0x1f) << 8) | (map.data[2] & 0xff);
+     while (stream_pids) {
+     if ((map.data[1] & 0x40)
+     && packet_pid == GPOINTER_TO_INT (stream_pids->data)) {
+     gst_base_ts_mux_push_packets (mux, TRUE);
+
+     if (mux->usec_time != GST_CLOCK_TIME_NONE) {
+     GstCaps *caps = gst_caps_new_empty_simple ("application/x-timestamp");
+     gst_buffer_add_reference_timestamp_meta (buf, caps, mux->usec_time, 0);
+     mux->usec_time = GST_CLOCK_TIME_NONE;
+     }
+
+     break;
+     }
+     stream_pids = g_list_next (stream_pids);
+     }
+
+     gst_buffer_unmap (buf, &map); */
   /* HGS */
 
   g_assert (klass->output_packet);
@@ -1275,8 +1284,20 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
     GstReferenceTimestampMeta *meta =
         gst_buffer_get_reference_timestamp_meta (buf, caps);
     gst_caps_unref (caps);
-    if (meta)
+    if (meta) {
       mux->usec_time = meta->timestamp;
+
+      tsmux_resend_pat (mux->tsmux);
+      tsmux_resend_si (mux->tsmux);
+
+      /* output PMT for each program */
+      GList *cur;
+      for (cur = mux->tsmux->programs; cur; cur = cur->next) {
+        TsMuxProgram *program = (TsMuxProgram *) cur->data;
+
+        tsmux_resend_pmt (program);
+      }
+    }
   }
   /* HGS */
 
