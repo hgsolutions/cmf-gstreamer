@@ -709,8 +709,9 @@ gst_base_ts_mux_create_or_update_stream (GstBaseTsMux * mux,
     GST_ELEMENT_ERROR (mux, STREAM, MUX,
         ("Stream type change from %02x to %02x not supported",
             ts_pad->stream->stream_type, st), NULL);
-    goto error;
-  }
+     /*HGS*/
+        //goto error;
+   /*HGS*/}
 
   if (ts_pad->stream == NULL) {
     ts_pad->stream =
