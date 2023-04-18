@@ -706,7 +706,7 @@ gst_base_ts_mux_create_or_update_stream (GstBaseTsMux * mux,
   }
 
   if (ts_pad->stream && st != ts_pad->stream->stream_type) {
-    GST_ELEMENT_ERROR (mux, STREAM, MUX,
+    GST_ELEMENT_WARNING (mux, STREAM, MUX,
         ("Stream type change from %02x to %02x not supported",
             ts_pad->stream->stream_type, st), NULL);
      /*HGS*/
@@ -1286,13 +1286,13 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
         gst_buffer_get_reference_timestamp_meta (buf, caps);
     gst_caps_unref (caps);
     if (meta) {
+      GList *cur;
       mux->usec_time = meta->timestamp;
 
       tsmux_resend_pat (mux->tsmux);
       tsmux_resend_si (mux->tsmux);
 
       /* output PMT for each program */
-      GList *cur;
       for (cur = mux->tsmux->programs; cur; cur = cur->next) {
         TsMuxProgram *program = (TsMuxProgram *) cur->data;
 
