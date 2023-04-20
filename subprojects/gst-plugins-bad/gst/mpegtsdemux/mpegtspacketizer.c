@@ -484,8 +484,8 @@ mpegts_packetizer_parse_packet (MpegTSPacketizer2 * packetizer,
 
   /* transport_error_indicator 1 */
    /*HGS*/
-      /*if (G_UNLIKELY (tmp & 0x80))
-         return PACKET_BAD; */
+      //if (G_UNLIKELY (tmp & 0x80))
+      //return PACKET_BAD;
        /*HGS*/
       /* payload_unit_start_indicator 1 */
       packet->payload_unit_start_indicator = tmp & 0x40;
