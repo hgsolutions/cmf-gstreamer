@@ -2503,8 +2503,11 @@ static GstStaticCaps mpegts_caps = GST_STATIC_CAPS ("video/mpegts, "
  * null PIDs. Still, these streams are valid TS streams (for null packets,
  * AFC is supposed to be 0x1, but the spec also says decoders should just
  * discard any packets with AFC = 0x00) */
+/*HGS
+ * Remove test for transport stream error in header ((data[1] & 0x80) == 0x00 && \). We can have a valid TS file
+ * with this error and that's all we care about. Demuxer can handle the error downstream.
+ *HGS*/
 #define IS_MPEGTS_HEADER(data) (data[0] == 0x47 && \
-                                (data[1] & 0x80) == 0x00 && \
                                 ((data[3] & 0x30) != 0x00 || \
                                 ((data[3] & 0x30) == 0x00 && (data[1] & 0x1f) == 0x1f && (data[2] & 0xff) == 0xff)))
 
