@@ -3,3 +3,7 @@ directory=gst-plugins-rs
 url=https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs.git
 push-url=git@gitlab.freedesktop.org:gstreamer/gst-plugins-rs.git
 revision=0.10
+
+patch_url = http://artifact.suffolk.harris.com:8081/repository/harris-releases/com/harris/source-code/gst-plugins-rs-patch/0.10/gst-plugins-rs-patch-0.10.zip
+patch_filename = gst-plugins-rs-patch-0.10.zip
+patch_hash = 8c135dc754c6daf916b79879e44bf9cb1675e5508c0db4647ea0737715727d2b
