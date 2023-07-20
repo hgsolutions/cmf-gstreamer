@@ -79,6 +79,14 @@ struct _GstJpegParse {
 
   /* tags */
   GstTagList *tags;
+
+  /* CMF - auto detect framerate */
+  gboolean framerate_autodetect;
+  gulong framerate_autodetect_duration;
+  gboolean framerate_detect;
+  gint framerate_count;
+  GstClockTime framerate_start;
+  /* CMF - End */
 };
 
 struct _GstJpegParseClass {

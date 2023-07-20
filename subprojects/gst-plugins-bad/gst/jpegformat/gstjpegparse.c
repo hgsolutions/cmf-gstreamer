@@ -54,6 +54,10 @@
 
 #include "gstjpegparse.h"
 
+/* CMF */
+#include <math.h>
+/* CMF - End */
+
 static GstStaticPadTemplate gst_jpeg_parse_src_pad_template =
 GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
@@ -72,6 +76,19 @@ GST_STATIC_PAD_TEMPLATE ("sink",
     GST_STATIC_CAPS ("image/jpeg")
     );
 
+/* CMF - Framerate autodetect properties */
+#define DEFAULT_FRAMERATE_AUTODETECT FALSE
+#define DEFAULT_FRAMERATE_AUTODETECT_DURATION 3000000
+
+enum
+{
+  PROP_0,
+  PROP_FRAMERATE_AUTODETECT,
+  PROP_FRAMERATE_AUTODETECT_DURATION,
+  PROP_LAST
+};
+/* CMF - End */
+
 GST_DEBUG_CATEGORY_STATIC (jpeg_parse_debug);
 #define GST_CAT_DEFAULT jpeg_parse_debug
 
@@ -86,6 +103,12 @@ static gboolean gst_jpeg_parse_start (GstBaseParse * parse);
 static gboolean gst_jpeg_parse_stop (GstBaseParse * parse);
 static GstFlowReturn gst_jpeg_parse_pre_push_frame (GstBaseParse * bparse,
     GstBaseParseFrame * frame);
+/* CMF */
+static void gst_jpeg_parse_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec);
+static void gst_jpeg_parse_get_property (GObject * object, guint prop_id,
+    GValue * value, GParamSpec * pspec);
+/* CMF - End */
 
 #define gst_jpeg_parse_parent_class parent_class
 G_DEFINE_TYPE (GstJpegParse, gst_jpeg_parse, GST_TYPE_BASE_PARSE);
@@ -97,9 +120,33 @@ gst_jpeg_parse_class_init (GstJpegParseClass * klass)
 {
   GstBaseParseClass *gstbaseparse_class;
   GstElementClass *gstelement_class;
+  /* CMF */
+  GObjectClass *gobject_class;
+  /* CMF - End */
 
   gstbaseparse_class = (GstBaseParseClass *) klass;
   gstelement_class = (GstElementClass *) klass;
+
+  /* CMF - Framerate auto-detect property handles and initialization */
+  gobject_class = G_OBJECT_CLASS (klass);
+
+  gobject_class->set_property = GST_DEBUG_FUNCPTR (gst_jpeg_parse_set_property);
+  gobject_class->get_property = GST_DEBUG_FUNCPTR (gst_jpeg_parse_get_property);
+
+  g_object_class_install_property (gobject_class, PROP_FRAMERATE_AUTODETECT,
+      g_param_spec_boolean ("framerate-autodetect", "Auto-detect the framerate",
+          "Attempts to determine the framerate over time",
+          DEFAULT_FRAMERATE_AUTODETECT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class,
+      PROP_FRAMERATE_AUTODETECT_DURATION,
+      g_param_spec_ulong ("framerate-autodetect-duration",
+          "The framerate auto-detect duration",
+          "The amount of time to detect the framerate in microseconds",
+          0, G_MAXULONG, DEFAULT_FRAMERATE_AUTODETECT_DURATION,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  /* CMF - End */
 
   gstbaseparse_class->start = gst_jpeg_parse_start;
   gstbaseparse_class->stop = gst_jpeg_parse_stop;
@@ -126,6 +173,13 @@ static void
 gst_jpeg_parse_init (GstJpegParse * parse)
 {
   parse->next_ts = GST_CLOCK_TIME_NONE;
+  /* CMF */
+  parse->framerate_autodetect = DEFAULT_FRAMERATE_AUTODETECT;
+  parse->framerate_autodetect_duration = DEFAULT_FRAMERATE_AUTODETECT_DURATION;
+  parse->framerate_detect = parse->framerate_autodetect;
+  parse->framerate_start = GST_CLOCK_TIME_NONE;
+  parse->framerate_count = 0;
+  /* CMF - End */
 }
 
 static gboolean
@@ -737,6 +791,45 @@ gst_jpeg_parse_pre_push_frame (GstBaseParse * bparse, GstBaseParseFrame * frame)
 
   GST_BUFFER_DURATION (outbuf) = parse->duration;
 
+  /* CMF - Determine the framerate if specified to do so */
+  if (parse->framerate_detect && GST_BUFFER_TIMESTAMP_IS_VALID (outbuf)) {
+    GstClockTimeDiff diff;
+
+    if (parse->framerate_start == GST_CLOCK_TIME_NONE) {
+      parse->framerate_start = GST_BUFFER_TIMESTAMP (outbuf);
+    }
+
+    parse->framerate_count++;
+    diff = GST_CLOCK_DIFF (parse->framerate_start,
+        GST_BUFFER_TIMESTAMP (outbuf));
+
+    if (GST_TIME_AS_USECONDS (diff) >= parse->framerate_autodetect_duration) {
+      gint calculated_framerate;
+      gint framerate_variance;
+
+      calculated_framerate = parse->framerate_count /
+          GST_TIME_AS_SECONDS (diff);
+
+      // Attempt to align framerate to well known established framerates
+      framerate_variance = calculated_framerate % 5;
+      if (framerate_variance > 0 && calculated_framerate >= 5) {
+        calculated_framerate = framerate_variance <= 2 ?
+            calculated_framerate - framerate_variance :
+            calculated_framerate + (5 - framerate_variance);
+      }
+
+      parse->framerate_numerator = calculated_framerate;
+      parse->framerate_denominator = 1;
+      parse->has_fps = TRUE;
+      parse->framerate_detect = FALSE;
+      GST_DEBUG_OBJECT (parse, "detected framerate: %d/%d",
+          parse->framerate_numerator, parse->framerate_denominator);
+    } else {
+      return GST_BASE_PARSE_FLOW_DROPPED;
+    }
+  }
+  /* CMF - End */
+
   return GST_FLOW_OK;
 }
 
@@ -882,6 +975,11 @@ gst_jpeg_parse_start (GstBaseParse * bparse)
 
   parse->tags = NULL;
 
+  /* CMF */
+  parse->framerate_start = GST_CLOCK_TIME_NONE;
+  parse->framerate_count = 0;
+  /* CMF - End */
+
   return TRUE;
 }
 
@@ -899,3 +997,49 @@ gst_jpeg_parse_stop (GstBaseParse * bparse)
 
   return TRUE;
 }
+
+/* CMF */
+static void
+gst_jpeg_parse_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  GstJpegParse *parse;
+
+  parse = GST_JPEG_PARSE (object);
+
+  switch (prop_id) {
+    case PROP_FRAMERATE_AUTODETECT:
+      parse->framerate_autodetect = g_value_get_boolean (value);
+      parse->framerate_detect = parse->framerate_autodetect;
+      break;
+    case PROP_FRAMERATE_AUTODETECT_DURATION:
+      parse->framerate_autodetect_duration = g_value_get_ulong (value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+static void
+gst_jpeg_parse_get_property (GObject * object, guint prop_id, GValue * value,
+    GParamSpec * pspec)
+{
+  GstJpegParse *parse;
+
+  parse = GST_JPEG_PARSE (object);
+
+  switch (prop_id) {
+    case PROP_FRAMERATE_AUTODETECT:
+      g_value_set_boolean (value, parse->framerate_autodetect);
+      break;
+    case PROP_FRAMERATE_AUTODETECT_DURATION:
+      g_value_set_ulong (value, parse->framerate_autodetect_duration);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+/* CMF - End */
