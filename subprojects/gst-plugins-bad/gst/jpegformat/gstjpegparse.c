@@ -824,6 +824,11 @@ gst_jpeg_parse_pre_push_frame (GstBaseParse * bparse, GstBaseParseFrame * frame)
       parse->framerate_detect = FALSE;
       GST_DEBUG_OBJECT (parse, "detected framerate: %d/%d",
           parse->framerate_numerator, parse->framerate_denominator);
+      if (!gst_jpeg_parse_set_new_caps (parse, TRUE)) {
+        GST_ELEMENT_ERROR (parse, CORE, NEGOTIATION,
+            ("Can't set caps to the src pad"),
+            ("Can't set caps to the src pad"));
+      }
     } else {
       return GST_BASE_PARSE_FLOW_DROPPED;
     }
