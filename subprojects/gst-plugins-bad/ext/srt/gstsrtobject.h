@@ -26,6 +26,9 @@
 #include "gstsrt-enumtypes.h"
 
 #include <gio/gio.h>
+/* HGS */
+#define ENABLE_AEAD_API_PREVIEW 1
+/* HGS - End */
 #include <srt/srt.h>
 
 G_BEGIN_DECLS

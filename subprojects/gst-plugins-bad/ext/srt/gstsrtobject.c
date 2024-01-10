@@ -71,6 +71,7 @@ enum
   PROP_WAIT_FOR_CONNECTION,
   PROP_STREAMID,
   PROP_AUTHENTICATION,
+  PROP_CRYPTOMODE,
   PROP_LAST
 };
 
@@ -195,6 +196,11 @@ SrtOption srt_options[] = {
 #if SRT_VERSION_VALUE >= 0x10402
   {"bindtodevice", SRTO_BINDTODEVICE, G_TYPE_STRING},
 #endif
+/* HGS */
+#if SRT_VERSION_VALUE >= 0x10502
+  {"cryptomode", SRTO_CRYPTOMODE, G_TYPE_INT},
+#endif
+/* HGS - End */
   {"packetfilter", SRTO_PACKETFILTER, G_TYPE_STRING},
   {"retransmitalgo", SRTO_RETRANSMITALGO, G_TYPE_INT},
   {NULL}
@@ -437,6 +443,11 @@ gst_srt_object_set_property_helper (GstSRTObject * srtobject,
     case PROP_AUTHENTICATION:
       srtobject->authentication = g_value_get_boolean (value);
       break;
+      /* HGS */
+    case PROP_CRYPTOMODE:
+      gst_structure_set_value (srtobject->parameters, "cryptomode", value);
+      break;
+      /* HGS - End */
     default:
       goto err;
   }
@@ -544,6 +555,20 @@ gst_srt_object_get_property_helper (GstSRTObject * srtobject,
     case PROP_AUTHENTICATION:
       g_value_set_boolean (value, srtobject->authentication);
       break;
+      /* HGS */
+    case PROP_CRYPTOMODE:{
+      gint v;
+
+      GST_OBJECT_LOCK (srtobject->element);
+      if (!gst_structure_get_int (srtobject->parameters, "cryptomode", &v)) {
+        GST_WARNING_OBJECT (srtobject->element, "Failed to get 'cryptomode'");
+        v = 0;
+      }
+      g_value_set_int (value, v);
+      GST_OBJECT_UNLOCK (srtobject->element);
+      break;
+    }
+      /* HGS - End */
     default:
       return FALSE;
   }
@@ -704,6 +729,18 @@ gst_srt_object_install_properties_helper (GObjectClass * gobject_class)
           "Authentication",
           "Authenticate a connection",
           FALSE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  /** HGS
+   * GstSRTSrc:cryptomode:
+   *
+   * Defines the crypto mode if passphrase is set.
+   * This property can be set by URI parameters.
+   */
+  g_object_class_install_property (gobject_class, PROP_CRYPTOMODE,
+      g_param_spec_int ("cryptomode", "cryptomode",
+          "Crypto Mode: Auto=0, AES-CTR=1, AES-GCM=2", 0, 2, 0,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  /* HGS - End */
 }
 
 static void
