@@ -51,10 +51,11 @@ GST_DEBUG_CATEGORY_EXTERN (gst_debug_srtobject);
 /* We can't define SRTO_BINDTODEVICE since it depends on configuration flags *sigh* */
 #define SRTO_RETRANSMITALGO 61
 #endif
-
+/* HGS - 31 Jan 2024 */
 #define ELEMENT_WARNING_SRTSOCK_ERROR(code, reason) \
-  GST_ELEMENT_WARNING (srtobject->element, RESOURCE, code, \
+  GST_ELEMENT_ERROR (srtobject->element, RESOURCE, code, \
   ("Error on SRT socket. Trying to reconnect."), SRTSOCK_ERROR_DEBUG)
+/* HGS - End */
 
 enum
 {
