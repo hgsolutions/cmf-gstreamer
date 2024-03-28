@@ -2230,8 +2230,11 @@ gst_base_ts_mux_sink_event (GstAggregator * agg, GstAggregatorPad * agg_pad,
       gst_event_parse_stream_flags (event, &flags);
 
       /* HGS - Identify pad as a sparse data source */
-      if ((flags & GST_STREAM_FLAG_SPARSE))
+      if ((flags & GST_STREAM_FLAG_SPARSE)) {
         agg_pad->sparse = TRUE;
+        GST_INFO_OBJECT (mux,
+            "Received stream start event with GST_STREAM_FLAG_SPARSE flag");
+      }
       /* HGS */
 
       /* Don't wait for data on sparse inputs like metadata streams */
