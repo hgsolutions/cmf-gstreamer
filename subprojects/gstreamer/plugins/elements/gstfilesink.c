@@ -669,6 +669,8 @@ gst_file_sink_event (GstBaseSink * sink, GstEvent * event)
     {
       const GstSegment *segment;
 
+      gst_event_parse_segment (event, &segment);
+
       /* HGS */
       if (filesink->ignore_segment_events) {
         GST_DEBUG_OBJECT (filesink,
@@ -677,8 +679,6 @@ gst_file_sink_event (GstBaseSink * sink, GstEvent * event)
         break;
       }
       /* HGS */
-
-      gst_event_parse_segment (event, &segment);
 
       if (segment->format == GST_FORMAT_BYTES) {
         /* only try to seek and fail when we are going to a different
