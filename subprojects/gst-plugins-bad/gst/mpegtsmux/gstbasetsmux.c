@@ -1307,6 +1307,9 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
   if (buf && gst_buffer_get_size (buf) == 0
       && GST_BUFFER_FLAG_IS_SET (buf, GST_BUFFER_FLAG_GAP)) {
     gst_buffer_unref (buf);
+    /* Jagwire */
+    GST_DEBUG_OBJECT (mux, "Buffer size is 0 and GAP flag is set.");
+    /* Jagwire */
     return GST_FLOW_OK;
   }
 
@@ -1324,9 +1327,12 @@ gst_base_ts_mux_aggregate_buffer (GstBaseTsMux * mux,
         gst_buffer_unref (buf);
       g_mutex_unlock (&mux->lock);
       /* HGS */
-      if (ret == GST_FLOW_NOT_NEGOTIATED)
+      if (ret == GST_FLOW_NOT_NEGOTIATED) {
+        /* Jagwire */
+        GST_DEBUG_OBJECT (mux, "Flow not negotiated for pad.");
+        /* Jagwire */
         return GST_FLOW_OK;
-      else
+      } else
         return ret;
       /* HGS */
     }
@@ -2236,15 +2242,6 @@ gst_base_ts_mux_sink_event (GstAggregator * agg, GstAggregatorPad * agg_pad,
             "Received stream start event with GST_STREAM_FLAG_SPARSE flag");
       }
       /* HGS */
-
-      /* Don't wait for data on sparse inputs like metadata streams */
-      /*
-         if ((flags & GST_STREAM_FLAG_SPARSE)) {
-         GST_COLLECT_PADS_STATE_UNSET (data, GST_COLLECT_PADS_STATE_LOCKED);
-         gst_collect_pads_set_waiting (pads, data, FALSE);
-         GST_COLLECT_PADS_STATE_SET (data, GST_COLLECT_PADS_STATE_LOCKED);
-         }
-       */
       break;
     }
     default:
