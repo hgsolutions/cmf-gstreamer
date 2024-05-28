@@ -986,7 +986,7 @@ gst_h264_parser_parse_pic_timing (GstH264NalParser * nalparser,
       hrd = &vui->vcl_hrd_parameters;
     }
 
-    tim->CpbDpbDelaysPresentFlag = ! !hrd;
+    tim->CpbDpbDelaysPresentFlag = !!hrd;
     tim->pic_struct_present_flag = vui->pic_struct_present_flag;
 
     if (tim->CpbDpbDelaysPresentFlag) {
@@ -2720,7 +2720,9 @@ void
 gst_h264_video_calculate_framerate (const GstH264SPS * sps,
     guint field_pic_flag, guint pic_struct, gint * fps_num, gint * fps_den)
 {
-  gint num = 0;
+  /* Jagwire */
+  gint num = 30;
+  /* Jagwire - End */
   gint den = 1;
 
   /* To calculate framerate, we use this formula:
