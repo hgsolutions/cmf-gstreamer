@@ -175,6 +175,7 @@ GST_DEBUG_CATEGORY_STATIC (aggregator_debug);
   GST_TRACE_OBJECT (pad, "Releasing PAD lock from thread %p",           \
       g_thread_self());                                                 \
   g_mutex_unlock(&pad->priv->lock);                                     \
+  g_usleep(10);                                                         \
   GST_TRACE_OBJECT (pad, "Release PAD lock from thread %p",             \
         g_thread_self());                                               \
   } G_STMT_END
@@ -224,6 +225,7 @@ GST_DEBUG_CATEGORY_STATIC (aggregator_debug);
   GST_TRACE_OBJECT (self, "Releasing src lock from thread %p",      \
         g_thread_self());                                           \
   g_mutex_unlock(&self->priv->src_lock);                            \
+  g_usleep(10);                                                     \
   GST_TRACE_OBJECT (self, "Released src lock from thread %p",       \
         g_thread_self());                                           \
   } G_STMT_END
@@ -512,14 +514,8 @@ gst_aggregator_check_pads_ready (GstAggregator * self,
 
       /* Only consider this pad as worth waiting for if it's not already EOS.
        * There's no point in waiting for buffers on EOS pads */
-      /* HGS - Comment have_buffer flag. It's occasionally causes
-       * a lockup of pipeline but works correctly without this. Sleep
-       * is required for CPU control.
-       */
-
       if (!pad->priv->eos)
-        g_usleep (100);
-      //have_buffer = FALSE;
+        have_buffer = FALSE;
       else
         n_ready++;
     } else if (self->priv->peer_latency_live) {
