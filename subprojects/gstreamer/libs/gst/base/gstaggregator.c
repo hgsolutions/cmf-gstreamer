@@ -175,7 +175,7 @@ GST_DEBUG_CATEGORY_STATIC (aggregator_debug);
   GST_TRACE_OBJECT (pad, "Releasing PAD lock from thread %p",           \
       g_thread_self());                                                 \
   g_mutex_unlock(&pad->priv->lock);                                     \
-  g_usleep(10);                                                         \
+  /* Jagwire */g_usleep(10);                                            \
   GST_TRACE_OBJECT (pad, "Release PAD lock from thread %p",             \
         g_thread_self());                                               \
   } G_STMT_END
@@ -225,7 +225,7 @@ GST_DEBUG_CATEGORY_STATIC (aggregator_debug);
   GST_TRACE_OBJECT (self, "Releasing src lock from thread %p",      \
         g_thread_self());                                           \
   g_mutex_unlock(&self->priv->src_lock);                            \
-  g_usleep(10);                                                     \
+  /* Jagwire */g_usleep(10);                                        \
   GST_TRACE_OBJECT (self, "Released src lock from thread %p",       \
         g_thread_self());                                           \
   } G_STMT_END
