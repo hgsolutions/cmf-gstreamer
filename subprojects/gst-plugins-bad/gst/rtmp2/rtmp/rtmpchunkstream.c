@@ -231,17 +231,19 @@ select_chunk_type (GstRtmpChunkStream * cstream, GstBuffer * buffer)
 
   /* now at least type 2 */
 
-  if (old_meta->ts_delta != meta->ts_delta) {
-    GST_TRACE ("Picking header 2: timestamp delta mismatch; "
-        "want %" G_GUINT32_FORMAT " got %" G_GUINT32_FORMAT,
-        old_meta->ts_delta, meta->ts_delta);
-    return CHUNK_TYPE_2;
-  }
+  /* Jagwire */
+  //if (old_meta->ts_delta != meta->ts_delta) {
+  GST_TRACE ("Picking header 2: timestamp delta mismatch; "
+      "want %" G_GUINT32_FORMAT " got %" G_GUINT32_FORMAT,
+      old_meta->ts_delta, meta->ts_delta);
+  return CHUNK_TYPE_2;
+  //}
 
   /* now at least type 3 */
 
-  GST_TRACE ("Picking header 3");
-  return CHUNK_TYPE_3;
+  //GST_TRACE ("Picking header 3");
+  //return CHUNK_TYPE_3;
+  /* Jagwire - End */
 }
 
 static GstBuffer *
