@@ -2559,6 +2559,9 @@ gst_rtspsrc_alloc_udp_ports (GstRTSPStream * stream,
   gint tmp_rtp, tmp_rtcp;
   guint count;
   const gchar *host;
+  /* HGS */
+  char *uri;
+  /* HGS - End */
 
   src = stream->parent;
 
@@ -2582,10 +2585,16 @@ again:
       tmp_rtp >= src->client_port_range.max)
     goto no_ports;
 
-  udpsrc0 = gst_element_make_from_uri (GST_URI_SRC, host, NULL, NULL);
+  /* HGS */
+  udpsrc0 = gst_element_factory_make ("udpsrc", NULL);
   if (udpsrc0 == NULL)
     goto no_udp_protocol;
-  g_object_set (G_OBJECT (udpsrc0), "port", tmp_rtp, "reuse", FALSE, NULL);
+
+  uri = g_strdup_printf ("%s:%d", host, tmp_rtp);
+  g_object_set (G_OBJECT (udpsrc0), "uri", uri, "port", tmp_rtp, "reuse", FALSE,
+      NULL);
+  g_free (uri);
+  /* HGS - End */
 
   if (src->udp_buffer_size != 0)
     g_object_set (G_OBJECT (udpsrc0), "buffer-size", src->udp_buffer_size,
@@ -2633,7 +2642,7 @@ again:
   }
 
   /* allocate port+1 for RTCP now */
-  udpsrc1 = gst_element_make_from_uri (GST_URI_SRC, host, NULL, NULL);
+  udpsrc1 = gst_element_factory_make ("udpsrc", NULL);
   if (udpsrc1 == NULL)
     goto no_udp_rtcp_protocol;
 
@@ -2642,7 +2651,11 @@ again:
   if (src->client_port_range.max > 0 && tmp_rtcp > src->client_port_range.max)
     goto no_ports;
 
-  g_object_set (G_OBJECT (udpsrc1), "port", tmp_rtcp, "reuse", FALSE, NULL);
+  uri = g_strdup_printf ("%s:%d", host, tmp_rtcp);
+  g_object_set (G_OBJECT (udpsrc1), "uri", uri, "port", tmp_rtcp, "reuse",
+      FALSE, NULL);
+  g_free (uri);
+  /* HGS - End */
 
   GST_DEBUG_OBJECT (src, "starting RTCP on port %d", tmp_rtcp);
   ret = gst_element_set_state (udpsrc1, GST_STATE_READY);
@@ -2938,7 +2951,7 @@ gst_rtspsrc_perform_seek (GstRTSPSrc * src, GstEvent * event)
 
   /* If an accurate seek was requested, we want to clip the segment we
    * output in ONVIF mode to the requested bounds */
-  src->clip_out_segment = ! !(flags & GST_SEEK_FLAG_ACCURATE);
+  src->clip_out_segment = !!(flags & GST_SEEK_FLAG_ACCURATE);
   src->seek_seqnum = gst_event_get_seqnum (event);
 
   /* prepare for streaming again */
@@ -4400,12 +4413,16 @@ gst_rtspsrc_stream_configure_mcast (GstRTSPSrc * src, GstRTSPStream * stream,
 
   /* creating UDP source for RTP */
   if (min != -1) {
-    uri = g_strdup_printf ("udp://%s:%d", destination, min);
-    stream->udpsrc[0] =
-        gst_element_make_from_uri (GST_URI_SRC, uri, NULL, NULL);
-    g_free (uri);
+    /* HGS */
+    stream->udpsrc[0] = gst_element_factory_make ("udpsrc", NULL);
     if (stream->udpsrc[0] == NULL)
       goto no_element;
+
+    uri = g_strdup_printf ("udp://%s:%d", destination, min);
+    g_object_set (G_OBJECT (stream->udpsrc[0]), "uri", uri, "port", min,
+        "reuse", FALSE, NULL);
+    g_free (uri);
+    /* HGS - End */
 
     /* take ownership */
     gst_object_ref_sink (stream->udpsrc[0]);
@@ -4428,11 +4445,15 @@ gst_rtspsrc_stream_configure_mcast (GstRTSPSrc * src, GstRTSPStream * stream,
     GstCaps *caps;
 
     uri = g_strdup_printf ("udp://%s:%d", destination, max);
-    stream->udpsrc[1] =
-        gst_element_make_from_uri (GST_URI_SRC, uri, NULL, NULL);
+    stream->udpsrc[1] = gst_element_factory_make ("udpsrc", NULL);
     g_free (uri);
     if (stream->udpsrc[1] == NULL)
       goto no_element;
+
+    g_object_set (G_OBJECT (stream->udpsrc[1]), "uri", uri, "port", max,
+        "reuse", FALSE, NULL);
+    g_free (uri);
+    /* HGS - End */
 
     if (stream->profile == GST_RTSP_PROFILE_SAVP ||
         stream->profile == GST_RTSP_PROFILE_SAVPF)
@@ -4570,7 +4591,9 @@ gst_rtspsrc_stream_configure_udp_sinks (GstRTSPSrc * src,
   gint rtp_port, rtcp_port;
   gboolean do_rtp, do_rtcp;
   const gchar *destination;
-  gchar *uri, *name;
+  /* HGS */
+  gchar *name;
+  /* HGS - End */
   guint ttl = 0;
   GSocket *socket;
 
@@ -4594,12 +4617,14 @@ gst_rtspsrc_stream_configure_udp_sinks (GstRTSPSrc * src,
     GST_DEBUG_OBJECT (src, "configure RTP UDP sink for %s:%d", destination,
         rtp_port);
 
-    uri = g_strdup_printf ("udp://%s:%d", destination, rtp_port);
-    stream->udpsink[0] =
-        gst_element_make_from_uri (GST_URI_SINK, uri, NULL, NULL);
-    g_free (uri);
+    /* HGS */
+    stream->udpsink[0] = gst_element_factory_make ("udpsink", NULL);
     if (stream->udpsink[0] == NULL)
       goto no_sink_element;
+
+    g_object_set (G_OBJECT (stream->udpsink[0]), "host", destination, "port",
+        rtp_port, NULL);
+    /* HGS - End */
 
     /* don't join multicast group, we will have the source socket do that */
     /* no sync or async state changes needed */
@@ -4659,12 +4684,14 @@ gst_rtspsrc_stream_configure_udp_sinks (GstRTSPSrc * src,
     GST_DEBUG_OBJECT (src, "configure RTCP UDP sink for %s:%d", destination,
         rtcp_port);
 
-    uri = g_strdup_printf ("udp://%s:%d", destination, rtcp_port);
-    stream->udpsink[1] =
-        gst_element_make_from_uri (GST_URI_SINK, uri, NULL, NULL);
-    g_free (uri);
+    /* HGS */
+    stream->udpsink[1] = gst_element_factory_make ("udpsink", NULL);
     if (stream->udpsink[1] == NULL)
       goto no_sink_element;
+
+    g_object_set (G_OBJECT (stream->udpsink[1]), "host", destination, "port",
+        rtcp_port, NULL);
+    /* HGS - End */
 
     /* don't join multicast group, we will have the source socket do that */
     /* no sync or async state changes needed */
